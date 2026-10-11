@@ -1,0 +1,3 @@
+# Dependencies of the validation harness are installed on demand (npm install).
+node_modules/
+package-lock.json

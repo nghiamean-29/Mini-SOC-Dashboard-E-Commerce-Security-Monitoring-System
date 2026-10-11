@@ -1,0 +1,13 @@
+{
+  "name": "minisoc-sql-validation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runs the Flyway migrations of the Mini SOC project on a real PostgreSQL engine (PGlite, WASM) and checks the schema, the constraints and the SOC data flow.",
+  "type": "module",
+  "scripts": {
+    "validate": "node validate.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}

@@ -172,11 +172,31 @@
         </dependency>
 
         <!--
+            @DataJpaTest slices + TestEntityManager + AssertJ database assertions.
+            WHY A SEPARATE STARTER (instead of putting it in spring-boot-starter-test):
+            a JPA slice is only useful when the persistence layer is on the classpath,
+            so Spring Boot 4 ships one *-test starter per technology. Adding it here
+            keeps the slice tests of Phase 2 self-contained: no @SpringBootTest, no
+            web server, no security filter chain - just the entities, the repositories
+            and a real database.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
             Test starters added LATER, in the phase that first needs them
             (declaring unused dependencies is noise):
-              Phase 2 -> spring-boot-starter-data-jpa-test  (@DataJpaTest slices)
               Phase 3 -> spring-boot-starter-webmvc-test    (MockMvc, @WebMvcTest)
               Phase 3 -> spring-boot-starter-security-test  (@WithMockUser, csrf())
+            There is deliberately NO in-memory database (H2) dependency: the schema
+            uses PostgreSQL features the project depends on (JSONB, nextval(),
+            partial indexes, CHECK constraints with regexes). Testing the mapping
+            against a database that accepts the SQL only by accident would hide
+            exactly the bugs these tests exist to find; tests run against a real
+            PostgreSQL database (see src/test/resources/application-test.yml).
         -->
 
     </dependencies>

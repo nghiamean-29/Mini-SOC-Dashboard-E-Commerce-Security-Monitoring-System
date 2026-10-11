@@ -15,7 +15,7 @@ PostgreSQL 18 · Flyway · Thymeleaf · WebSocket/STOMP · JUnit 5 + Mockito · 
 |---|---|---|---|
 | **0** | Project Planning | ✅ Hoàn thành | [docs/PHASE-0-PLANNING.md](docs/PHASE-0-PLANNING.md) |
 | **1** | Project Initialization | ✅ Code xong — ⏳ chờ chạy `mvn` | [docs/PHASE-01-INITIALIZATION.md](docs/PHASE-01-INITIALIZATION.md) |
-| 2 | Database (Flyway + JPA entities) | ⬜ Chưa bắt đầu | — |
+| **2** | Database (Flyway + JPA entities) | ✅ Code xong — ✅ 9/9 migration + 64/64 ràng buộc đã kiểm chứng trên PostgreSQL 18.3 — ⏳ chờ chạy `mvn test` | [docs/PHASE-02-DATABASE.md](docs/PHASE-02-DATABASE.md) |
 | 3–14 | Auth → E-Commerce → SOC → Realtime → Simulator → Tests → Docker → Docs | ⬜ Chưa bắt đầu | — |
 
 Theo quy tắc SDD (§20): mỗi lần chỉ thực hiện **một phase**, kết thúc phase phải chạy/test, giải thích và **chờ xác nhận** trước khi sang phase tiếp theo.
@@ -63,14 +63,26 @@ Hướng dẫn cài đặt chi tiết (Windows / macOS / Linux): **[docs/ENVIRON
 ```bash
 psql -U postgres -c "CREATE ROLE minisoc LOGIN PASSWORD 'matkhau-cua-ban';"
 psql -U postgres -c "CREATE DATABASE minisoc_db OWNER minisoc ENCODING 'UTF8';"
+# Từ Phase 2: thêm database cho kiểm thử (mvn test chạy trên PostgreSQL thật, không dùng H2)
+psql -U postgres -c "CREATE DATABASE minisoc_test OWNER minisoc ENCODING 'UTF8';"
 ```
 
-### Build và test (không cần database)
+### Build và test
 
 ```bash
-mvn -q clean compile     # gate của Phase 1
-mvn test                 # 11 test
+mvn -q clean compile     # không cần database
+export DB_PASSWORD='matkhau-cua-ban'   # Windows: $env:DB_PASSWORD="..."
+mvn test                 # Phase 1: 11 test | Phase 2: + 6 lớp @DataJpaTest + 2 lớp unit test
+                         # (cần database minisoc_test — xem mục Tạo database ở trên)
 mvn -q clean package     # tạo target/mini-soc-dashboard-0.0.1-SNAPSHOT.jar
+```
+
+### Kiểm chứng lớp SQL (không cần PostgreSQL, không cần Maven)
+
+```bash
+cd tools/sql-validation
+npm install              # tải PGlite 0.5.8 (PostgreSQL 18.3 qua WASM)
+node validate.mjs        # 9/9 migration + 64/64 check PASS
 ```
 
 ### Chạy ứng dụng (cần PostgreSQL)
@@ -100,6 +112,7 @@ Kiểm tra: <http://localhost:8080/actuator/health> → `{"status":"UP"}`
 |---|---|
 | [docs/PHASE-0-PLANNING.md](docs/PHASE-0-PLANNING.md) | Requirements, Actors, Use Cases, Architecture, Database overview, Security architecture, Roadmap, Risks, ADR |
 | [docs/PHASE-01-INITIALIZATION.md](docs/PHASE-01-INITIALIZATION.md) | Giải thích `pom.xml`, cấu hình, cấu trúc package, test; 6 khác biệt của Spring Boot 4; cách kiểm chứng |
+| [docs/PHASE-02-DATABASE.md](docs/PHASE-02-DATABASE.md) | 9 migration Flyway, 17 bảng, 14 entity + 14 repository, 15 quyết định thiết kế, bằng chứng 64/64 check trên PostgreSQL 18.3, cách chạy `mvn test` |
 | [docs/ENVIRONMENT-SETUP.md](docs/ENVIRONMENT-SETUP.md) | Cài JDK/Maven/PostgreSQL, tạo DB theo least privilege, biến môi trường, xử lý sự cố |
 | [docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md) | **Cách lấy/cập nhật code về máy**: clone, `git pull`, xử lý conflict, nhánh `main` để nộp bài |
 
@@ -107,24 +120,33 @@ Kiểm tra: <http://localhost:8080/actuator/health> → `{"status":"UP"}`
 
 ---
 
-## 🧱 Cấu trúc project hiện tại (Phase 1)
+## 🧱 Cấu trúc project hiện tại (Phase 1–2)
 
 ```
 src/main/java/com/yak/minisoc/
 ├── MiniSocApplication.java      # @SpringBootApplication (entry point)
-├── config/         controller/    dto/          entity/     repository/
-├── service/        security/      detection/    alert/      incident/
-├── audit/          simulator/     exception/    mapper/     validation/
-├── websocket/      util/
-└──      ↑ mỗi package có package-info.java giải thích trách nhiệm + layer + quy tắc phụ thuộc
+├── entity/                       # PHASE 2: 3 base class + 14 entity + 11 enum (security/ cho SOC)
+├── repository/                   # PHASE 2: 14 interface Spring Data JPA
+├── util/BusinessCodes.java       # PHASE 2: mã ORD-yyyyMMdd-NNNNNN và INC-0001
+├── config/         controller/    dto/          service/    security/
+├── detection/      alert/         incident/     audit/      simulator/
+├── exception/      mapper/        validation/   websocket/
+└──      ↑ các package này có package-info.java (Phase 1) và sẽ được lấp đầy từ Phase 3 trở đi
 
 src/main/resources/
 ├── application.yml          # cấu hình chung (secret đọc từ ENV)
 ├── application-dev.yml      # log SQL, template cache off, simulator bật
 ├── application-prod.yml     # không có default cho credential, simulator tắt
-├── db/migration/            # Flyway (Phase 2)
+├── db/migration/            # PHASE 2: V1..V9 - nguồn sự thật của schema
 ├── templates/               # Thymeleaf (Phase 3+)
 └── static/{css,js,vendor}/  # HTML/CSS/JS thuần (không framework JS)
+
+src/test/
+├── resources/application-test.yml   # PHASE 2: profile test (PostgreSQL minisoc_test)
+└── java/…/repository/               # PHASE 2: 6 lớp @DataJpaTest
+
+tools/sql-validation/                # PHASE 2: harness kiểm chứng SQL trên PostgreSQL 18.3
+└── validate.mjs                     # node validate.mjs → 64/64 check
 ```
 
 ---

@@ -208,7 +208,23 @@ CREATE DATABASE minisoc_db OWNER minisoc ENCODING 'UTF8';
 
 > **Vì sao không dùng user `postgres` cho ứng dụng?** Nguyên tắc **least privilege**: ứng dụng chỉ cần quyền trên một database, không cần quyền superuser. Nếu ứng dụng bị khai thác, thiệt hại bị giới hạn. Đây cũng là một điểm bạn nên nói khi bảo vệ đồ án (mục Security).
 
-### 4.3. Xác nhận kết nối bằng chính role của ứng dụng
+### 4.3. Tạo database cho KIỂM THỬ (từ Phase 2 trở đi)
+
+`mvn test` chạy các JPA slice test trên **PostgreSQL thật** (không dùng H2 — lý do: xem
+[docs/PHASE-02-DATABASE.md §7](PHASE-02-DATABASE.md)), vì vậy cần thêm **một database riêng**:
+
+```sql
+-- Trong psql (superuser), sau khi đã có role minisoc ở §4.2:
+CREATE DATABASE minisoc_test OWNER minisoc ENCODING 'UTF8';
+```
+
+* Database test **tách biệt** với `minisoc_db` để `mvn test` **không bao giờ** chạm vào dữ liệu bạn
+  dùng khi chạy ứng dụng.
+* Flyway tự tạo bảng trong `minisoc_test` ở lần chạy test đầu tiên — bạn **không** tạo bảng bằng tay.
+* Nếu muốn dùng tên/credential khác: đặt `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`
+  (xem `src/test/resources/application-test.yml`).
+
+### 4.4. Xác nhận kết nối bằng chính role của ứng dụng
 
 ```bash
 psql -h localhost -p 5432 -U minisoc -d minisoc_db -c "SELECT version();"
@@ -232,6 +248,9 @@ Kỳ vọng: in ra `PostgreSQL 18.x ...`. Nếu bị hỏi mật khẩu → nh�
 | `DB_PASSWORD` | `DoiMatKhauNay_2026` | Mật khẩu (⚠️ **không** commit vào git) |
 | `APP_SIMULATOR_ENABLED` | `true` (dev) / `false` (prod) | Bật/tắt Attack Simulator |
 | `SPRING_PROFILES_ACTIVE` | `dev` | Chọn profile cấu hình |
+| `TEST_DB_URL` | `jdbc:postgresql://localhost:5432/minisoc_test` | *Tuỳ chọn* — database cho `mvn test` (mặc định đã đúng nếu bạn làm §4.3) |
+| `TEST_DB_USERNAME` | `minisoc` | *Tuỳ chọn* — mặc định lấy theo `DB_USERNAME` |
+| `TEST_DB_PASSWORD` | (như `DB_PASSWORD`) | *Tuỳ chọn* — mặc định lấy theo `DB_PASSWORD` |
 
 ### 5.1. Windows PowerShell (chỉ có tác dụng trong cửa sổ hiện tại)
 
