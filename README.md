@@ -34,6 +34,19 @@ git checkout arena/01a0c33c-mini-soc-dashboard-e-commerce
 
 **Cập nhật về sau:** `git pull --ff-only` (chi tiết + xử lý sự cố: **[docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md)**)
 
+### ⚠️ Đọc trước: ở Phase 1 chạy được gì?
+
+`src/` hiện **toàn `package-info.java`** (chỉ là chú thích tài liệu, không có code thực thi) — đó là **thiết kế của Phase 1**, không phải lỗi. Toàn bộ `src/main` chỉ có **1 class chạy được**: `MiniSocApplication`.
+
+| Việc | Cần PostgreSQL? | Bằng chứng thành công |
+|---|---|---|
+| `mvn -q clean compile` | ❌ | exit code 0 (**gate của Phase 1**) |
+| `mvn test` | ❌ | `Tests run: 11, Failures: 0, Errors: 0` |
+| `mvn -q clean package` | ❌ | có `target/mini-soc-dashboard-0.0.1-SNAPSHOT.jar` |
+| `mvn spring-boot:run` | ✅ **có** | log `Started MiniSocApplication` + `/actuator/health` → `{"status":"UP"}` |
+
+**Chưa có trang web nào** để mở trên trình duyệt (mở `http://localhost:8080/` sẽ ra **404** — đúng như mong đợi): trang đăng nhập ở Phase 3, trang sản phẩm ở Phase 4. Chi tiết và giải thích: [docs/PHASE-01-INITIALIZATION.md §1.1](docs/PHASE-01-INITIALIZATION.md).
+
 ### Yêu cầu môi trường
 
 | Thành phần | Version | Bắt buộc |

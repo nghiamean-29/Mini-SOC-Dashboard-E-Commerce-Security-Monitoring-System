@@ -49,6 +49,81 @@ Mini-SOC-Dashboard-E-Commerce-Security-Monitoring-System/
     └── config/ConfigurationFilesTest.java← kiểm tra chính các file cấu hình
 ```
 
+### 1.1. FAQ — "mở `src` ra toàn thấy `package-info.java`, vậy chạy cái gì?"
+
+Đây là câu hỏi rất tự nhiên, và câu trả lời là: **đúng như thiết kế, không phải thiếu sót.**
+
+**Trước hết, `package-info.java` là gì?**
+
+Đó là một cú pháp **hợp lệ của Java** để viết Javadoc cho **cả một package**: phần chú thích `/** ... */` đặt ngay trên dòng `package com.yak.minisoc.util;`.
+
+```java
+/**
+ * <h2>Small helpers with no framework dependency</h2>
+ * ... mô tả trách nhiệm của package ...
+ */
+package com.yak.minisoc.util;   // ← chỉ có 1 dòng khai báo, KHÔNG có class nào
+```
+
+Điểm quan trọng: file này **không khai báo `class`/`interface`/`enum`/`record` nào** ⇒ **không thêm bất kỳ hành vi nào** vào ứng dụng khi chạy. Nó tồn tại vì hai lý do:
+
+1. **Tài liệu**: công cụ Javadoc đọc nó để sinh "package summary"; bạn và giảng viên đọc nó để biết package đó có trách nhiệm gì — đúng như hợp đồng kiến trúc đã thiết kế ở Phase 0 §9.
+2. **Nhắc nhở ngay tại chỗ**: mở `service/` là thấy ngay "controller không được gọi từ đây".
+
+**Vậy trong toàn bộ `src/main` có bao nhiêu class thật?**
+
+| | Số lượng | Ghi chú |
+|---|---|---|
+| Class/interface **chạy được** | **1** | `MiniSocApplication` (có `public static void main`) |
+| File chỉ để **document** | **17** | `package-info.java` — không có code thực thi |
+| Controller (trang web) | **0** | trang đầu tiên xuất hiện ở Phase 3–4 |
+| Entity / bảng database | **0** | Phase 2 tạo 16 bảng |
+| Unit test | 2 file / 11 test | chạy được **không cần database** |
+
+**Kiểm chứng bằng lệnh (bạn tự chạy được):**
+
+```bash
+# 1) Liệt kê các file THẬT SỰ có code (bỏ package-info ra)
+find src -name "*.java" ! -name "package-info.java"
+#    -> src/main/java/com/yak/minisoc/MiniSocApplication.java
+#    -> src/test/java/com/yak/minisoc/MiniSocApplicationTest.java
+#    -> src/test/java/com/yak/minisoc/config/ConfigurationFilesTest.java
+
+# 2) Chứng minh package-info.java không khai báo class nào (kết quả phải là 0 với mọi file)
+grep -cE "^[[:space:]]*(public |final |abstract )*(class|interface|enum|record) " \
+     $(find src -name "package-info.java")
+```
+
+**Vậy "chạy" ở Phase 1 nghĩa là gì?** Ba thứ **có thể kiểm chứng được ngay**:
+
+| # | Việc chạy | Cần database? | Bằng chứng thành công |
+|---|---|---|---|
+| 1 | `mvn -q clean compile` | ❌ không | không có lỗi, exit code 0 (**gate của Phase 1**) |
+| 2 | `mvn test` | ❌ không | `Tests run: 11, Failures: 0, Errors: 0` |
+| 3 | `mvn -q clean package` + kiểm tra jar | ❌ không | jar có `BOOT-INF/classes/com/yak/minisoc/MiniSocApplication.class` |
+| 4 | `mvn spring-boot:run` | ✅ **có** (PostgreSQL) | log: `Started MiniSocApplication in ...` + `curl /actuator/health` → `{"status":"UP"}` |
+
+> ⚠️ **Chưa có trang nào để xem trên trình duyệt ở Phase 1.** Mở `http://localhost:8080/` sẽ thấy **404** — đó là kết quả **đúng**. Trang đầu tiên (đăng nhập) thuộc Phase 3, trang sản phẩm thuộc Phase 4.
+>
+> **Vì sao tôi không tạo tạm một trang "Hello World" cho dễ thấy?** Hai lý do: (a) nó sẽ bị xoá ngay ở Phase 3 vì mọi trang phải nằm trong bản đồ quyền hạn `/`, `/admin/**`, `/soc/**`; (b) quan trọng hơn — **nó không giải quyết được trở ngại thật**: vì có JPA + Flyway trên classpath, ứng dụng **buộc phải kết nối được PostgreSQL** mới khởi động, dù có controller hay không. Nói cách khác, thứ bạn cần là **PostgreSQL**, không phải một trang HTML tạm.
+
+**Lộ trình: `src` sẽ dày lên như thế nào?** (để bạn biết mình đang ở đâu)
+
+| Phase | Package sẽ có code thật |
+|---|---|
+| **1 ✅** | `MiniSocApplication` + 17 `package-info.java` (tài liệu) |
+| 2 | `entity/` (16 entity + `BaseEntity`), `repository/` (16 interface), `db/migration/` (8 file SQL) |
+| 3 | `security/`, `config/SecurityConfig`, `controller/AuthController`, `service/UserService`, `dto/request/`, `validation/`, `exception/`, `templates/login.html` |
+| 4 | `entity/` + `repository/` + `service/` + `controller/` + `mapper/` cho Product/Cart/Order, `templates/` cho shop |
+| 5 | `audit/` (collector, HTTP filter, login listener) + `entity/security/` |
+| 6 | **`detection/`** — `SecurityRule` + 5 rule + `DetectionEngine` + sliding window |
+| 7 | `alert/` + `controller/soc/` + `templates/` cho alert |
+| 8 | `incident/` + giao diện điều tra |
+| 9 | `service/DashboardService` + dashboard + chart |
+| 10 | `websocket/`, `config/WebSocketConfig`, `static/vendor/` (STOMP client) |
+| 11 | `simulator/` (5 simulator) |
+| 12–14 | mở rộng `src/test/`, `docker-compose.yml`, hoàn thiện `docs/` |
+
 ---
 
 ## 2. SÁU PHÁT HIỆN VỀ SPRING BOOT 4 (đã kiểm tra thực tế, không đoán)
