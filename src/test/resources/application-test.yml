@@ -46,9 +46,8 @@ spring:
     properties:
       hibernate:
         jdbc:
+          # Same rule as the application: timestamps are UTC everywhere.
           time_zone: UTC
-        # Show the executed SQL when a test fails? Run with -Dtest.debug.sql=true
-        show_sql: false
 
   flyway:
     # The migrations run for real, so the test database gets the same schema as

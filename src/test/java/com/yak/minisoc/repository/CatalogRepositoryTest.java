@@ -13,7 +13,9 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -21,6 +23,10 @@ import org.springframework.test.context.ActiveProfiles;
 
 /** Persistence tests for the catalogue: {@link CategoryRepository} and {@link ProductRepository}. */
 @DataJpaTest
+// Flyway is NOT part of the @DataJpaTest slice in Spring Boot 4: the slice only
+// imports the JPA/JDBC auto-configurations, so the migrations must be imported
+// explicitly or the schema would simply not exist when Hibernate validates it.
+@ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 class CatalogRepositoryTest {

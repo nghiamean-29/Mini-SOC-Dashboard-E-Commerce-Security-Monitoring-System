@@ -178,6 +178,26 @@ Các ràng buộc **đã thực sự từ chối** dữ liệu xấu (trích th�
 Thêm 2 unit test thuần Java (không cần Spring/database): `OrderStatusTest` (state machine) và
 `BusinessCodesTest` (định dạng mã, độ dài cột, UTC).
 
+### 3.3. Một "bẫy" của Spring Boot 4 đã gặp và xử lý
+
+`@DataJpaTest` **không** tự chạy Flyway. Slice này chỉ import các auto-configuration của JPA/JDBC
+(kiểm chứng trong source Boot 4.1.1: `AutoConfigureDataJpa.imports` và `AutoConfigureJdbc.imports`
+không có `FlywayAutoConfiguration`). Hệ quả: nếu để nguyên, test sẽ báo *"missing table users"* vì
+schema chưa được tạo.
+
+Cách xử lý (đã áp dụng cho cả 6 lớp test):
+
+```java
+@DataJpaTest
+@ImportAutoConfiguration(FlywayAutoConfiguration.class)   // ← dòng quyết định
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@ActiveProfiles("test")
+```
+
+Vì `FlywayAutoConfiguration` có `FlywayMigrationInitializerDatabaseInitializerDetector`, còn JPA có
+`JpaDependsOnDatabaseInitializationDetector`, thứ tự được bảo đảm: **Flyway chạy xong migration rồi
+Hibernate mới `validate`** — đúng như khi ứng dụng khởi động.
+
 ---
 
 ## 4. ĐỌC CODE Ở ĐÂU TRƯỚC?
@@ -270,6 +290,7 @@ cd tools/sql-validation && npm install && node validate.mjs     # 64 passed, 0 f
 | `Schema-validation: missing table [...]` hoặc mismatch cột | Entity không khớp migration | Đó là **mục đích** của `ddl-auto=validate`: đối chiếu tên cột trong lỗi với file `V*.sql` |
 | `Schema-validation: wrong column type [...] jsonb [...]` (nếu có) | Khác biệt *trình bày* giữa Hibernate và PostgreSQL | Đổi `spring.jpa.hibernate.ddl-auto` trong `application-test.yml` thành `none` — test vẫn chạy trên schema thật, chỉ bỏ bước validate |
 | `Migration checksum mismatch for version 4` | Bạn (hoặc ai đó) sửa file migration **đã chạy** | Đổi tên file thành `V10__...` mới, hoặc xóa database test rồi migrate lại từ đầu (chỉ trong dev) |
+| `Schema-validation: missing table [users]` mà Flyway **không** in log migration | Thiếu `@ImportAutoConfiguration(FlywayAutoConfiguration.class)` (xem §3.3) | Đã có sẵn trong 6 lớp test — nếu bạn tạo lớp test mới, nhớ thêm dòng đó |
 | Test báo `DataIntegrityViolationException` ở test **không** liên quan tới ràng buộc | Dữ liệu test rò rỉ giữa các test | Mỗi test tự rollback; nếu sai, kiểm tra xem test có tự `commit` hay dùng `@Transactional(propagation=NOT_SUPPORTED)` không |
 | `Tests run: 0` | Maven không nhận diện JUnit 5 | Kiểm tra `spring-boot-starter-test` (đã có) và tên file `*Test.java` |
 
