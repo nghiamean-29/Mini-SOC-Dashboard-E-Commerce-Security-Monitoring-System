@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head th:replace="~{fragments/layout :: head('Không tìm thấy trang')}">
+    <title>404</title>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: nav(false, null, false, false, false)}"></nav>
+
+<main class="page page-narrow">
+    <div class="auth-card error-card">
+        <p class="error-code">404</p>
+        <h1>Không tìm thấy trang</h1>
+
+        <p>
+            Không có xử lý nào cho đường dẫn
+            <code th:text="${path} ?: '(không rõ)'">/duong-dan-la</code>.
+        </p>
+
+        <!-- Honest explanation instead of the usual dead end: during development this
+             page is reached most often because the feature belongs to a later phase. -->
+        <div class="alert alert-info">
+            <strong>Đang phát triển theo từng phase.</strong>
+            <span>
+                Nếu bạn vừa bấm vào <code>/cart</code>, <code>/orders</code>,
+                <code>/admin</code> hay <code>/soc</code>: các trang đó lần lượt xuất hiện ở
+                Phase 4 (shop) và Phase 9 (dashboard SOC). Role đã được kiểm tra đúng —
+                chỉ có giao diện là chưa tới.
+            </span>
+        </div>
+
+        <div class="cta-row">
+            <a class="btn btn-primary" th:href="@{/}">Về trang chủ</a>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

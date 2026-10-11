@@ -87,6 +87,19 @@ app:
     # The Attack Simulator is a demo/testing tool: OFF unless a profile enables it.
     enabled: ${APP_SIMULATOR_ENABLED:false}
 
+  # ---------------------------------------------------------------------------
+  # First administrator (Phase 3). No default value, on purpose: as long as the
+  # variables are not set, no privileged account exists - the operator creates it
+  # explicitly, once, at first start-up. See docs/PHASE-03-AUTHENTICATION.md.
+  # ---------------------------------------------------------------------------
+  bootstrap:
+    admin:
+      username: ${APP_BOOTSTRAP_ADMIN_USERNAME:}
+      # Never logged, never committed, and hashed by BCrypt before it is stored.
+      password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
+      email: ${APP_BOOTSTRAP_ADMIN_EMAIL:}
+      full-name: ${APP_BOOTSTRAP_ADMIN_FULL_NAME:}
+
   security:
     detection:
       # Thresholds of the detection rules (FR-DET-07: configurable, never

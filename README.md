@@ -16,7 +16,8 @@ PostgreSQL 18 · Flyway · Thymeleaf · WebSocket/STOMP · JUnit 5 + Mockito · 
 | **0** | Project Planning | ✅ Hoàn thành | [docs/PHASE-0-PLANNING.md](docs/PHASE-0-PLANNING.md) |
 | **1** | Project Initialization | ✅ Code xong — ⏳ chờ chạy `mvn` | [docs/PHASE-01-INITIALIZATION.md](docs/PHASE-01-INITIALIZATION.md) |
 | **2** | Database (Flyway + JPA entities) | ✅ Code xong — ✅ 9/9 migration + 64/64 ràng buộc đã kiểm chứng trên PostgreSQL 18.3 — ⏳ chờ chạy `mvn test` | [docs/PHASE-02-DATABASE.md](docs/PHASE-02-DATABASE.md) |
-| 3–14 | Auth → E-Commerce → SOC → Realtime → Simulator → Tests → Docker → Docs | ⬜ Chưa bắt đầu | — |
+| **3** | Authentication & Authorization (Spring Security, 3 role) | ✅ Code xong — ✅ gói/annotation đã đối chiếu với Boot 4.1.1 & Security 7.1.1 — ⏳ chờ `mvn test` + đăng nhập thử | [docs/PHASE-03-AUTHENTICATION.md](docs/PHASE-03-AUTHENTICATION.md) |
+| 4–14 | E-Commerce → SOC → Realtime → Simulator → Tests → Docker → Docs | ⬜ Chưa bắt đầu | — |
 
 Theo quy tắc SDD (§20): mỗi lần chỉ thực hiện **một phase**, kết thúc phase phải chạy/test, giải thích và **chờ xác nhận** trước khi sang phase tiếp theo.
 
@@ -34,18 +35,20 @@ git checkout arena/01a0c33c-mini-soc-dashboard-e-commerce
 
 **Cập nhật về sau:** `git pull --ff-only` (chi tiết + xử lý sự cố: **[docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md)**)
 
-### ⚠️ Đọc trước: ở Phase 1 chạy được gì?
-
-`src/` hiện **toàn `package-info.java`** (chỉ là chú thích tài liệu, không có code thực thi) — đó là **thiết kế của Phase 1**, không phải lỗi. Toàn bộ `src/main` chỉ có **1 class chạy được**: `MiniSocApplication`.
+### ⚠️ Đọc trước: ở Phase 3 chạy được gì?
 
 | Việc | Cần PostgreSQL? | Bằng chứng thành công |
 |---|---|---|
-| `mvn -q clean compile` | ❌ | exit code 0 (**gate của Phase 1**) |
-| `mvn test` | ❌ | `Tests run: 11, Failures: 0, Errors: 0` |
+| `mvn -q clean compile` | ❌ | exit code 0 |
+| `mvn test` | ✅ **có** (`minisoc_test`) | `Tests run: 158, Failures: 0, Errors: 0` |
 | `mvn -q clean package` | ❌ | có `target/mini-soc-dashboard-0.0.1-SNAPSHOT.jar` |
-| `mvn spring-boot:run` | ✅ **có** | log `Started MiniSocApplication` + `/actuator/health` → `{"status":"UP"}` |
+| `mvn spring-boot:run` | ✅ **có** | log `Started MiniSocApplication`; mở `http://localhost:8080/` thấy trang chủ |
 
-**Chưa có trang web nào** để mở trên trình duyệt (mở `http://localhost:8080/` sẽ ra **404** — đúng như mong đợi): trang đăng nhập ở Phase 3, trang sản phẩm ở Phase 4. Chi tiết và giải thích: [docs/PHASE-01-INITIALIZATION.md §1.1](docs/PHASE-01-INITIALIZATION.md).
+**Đã có trang web**: `/` (trang chủ), `/login`, `/register`, và 3 trang lỗi (`403`, `404`, lỗi chung).
+Vì có Spring Security, các URL khác (`/cart`, `/orders`, `/admin/**`, `/soc/**`) **yêu cầu đăng nhập
+trước**; sau khi đăng nhập, `/admin/**` và `/soc/**` trả **403** nếu sai role, còn `/cart`, `/orders`
+trả **404** vì giao diện thuộc Phase 4. Đó là kết quả đúng — bảng kiểm tra chi tiết ở
+[docs/PHASE-03-AUTHENTICATION.md §5.4](docs/PHASE-03-AUTHENTICATION.md).
 
 ### Yêu cầu môi trường
 
@@ -72,7 +75,7 @@ psql -U postgres -c "CREATE DATABASE minisoc_test OWNER minisoc ENCODING 'UTF8';
 ```bash
 mvn -q clean compile     # không cần database
 export DB_PASSWORD='matkhau-cua-ban'   # Windows: $env:DB_PASSWORD="..."
-mvn test                 # Phase 1: 11 test | Phase 2: + 6 lớp @DataJpaTest + 2 lớp unit test
+mvn test                 # Phase 1+2: 73 test | Phase 3: + 8 lớp / 85 test (158 tổng)
                          # (cần database minisoc_test — xem mục Tạo database ở trên)
 mvn -q clean package     # tạo target/mini-soc-dashboard-0.0.1-SNAPSHOT.jar
 ```
@@ -98,7 +101,15 @@ $env:DB_PASSWORD="matkhau-cua-ban"; $env:SPRING_PROFILES_ACTIVE="dev"
 mvn spring-boot:run
 ```
 
-Kiểm tra: <http://localhost:8080/actuator/health> → `{"status":"UP"}`
+Mở <http://localhost:8080/> → trang chủ. Đăng ký ở `/register`, đăng nhập ở `/login`.
+
+> 🔐 Muốn có tài khoản **ADMIN** đầu tiên (để gán role cho người khác), đặt thêm biến môi trường
+> `APP_BOOTSTRAP_ADMIN_USERNAME`, `APP_BOOTSTRAP_ADMIN_PASSWORD`, `APP_BOOTSTRAP_ADMIN_EMAIL`,
+> `APP_BOOTSTRAP_ADMIN_FULL_NAME` rồi chạy lại — hướng dẫn đầy đủ ở
+> [docs/PHASE-03-AUTHENTICATION.md §5.2](docs/PHASE-03-AUTHENTICATION.md).
+> Cách gán role `SOC_ANALYST` bằng SQL: cùng tài liệu, §5.3.
+
+Kiểm tra sức khoẻ (chỉ ADMIN, cần đăng nhập trước): <http://localhost:8080/actuator/health> → `{"status":"UP"}`
 
 > ℹ️ **Secret không bao giờ nằm trong repo.** Cấu hình đọc từ biến môi trường
 > (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`) — xem `config/env/dev.env.example`.
@@ -113,6 +124,7 @@ Kiểm tra: <http://localhost:8080/actuator/health> → `{"status":"UP"}`
 | [docs/PHASE-0-PLANNING.md](docs/PHASE-0-PLANNING.md) | Requirements, Actors, Use Cases, Architecture, Database overview, Security architecture, Roadmap, Risks, ADR |
 | [docs/PHASE-01-INITIALIZATION.md](docs/PHASE-01-INITIALIZATION.md) | Giải thích `pom.xml`, cấu hình, cấu trúc package, test; 6 khác biệt của Spring Boot 4; cách kiểm chứng |
 | [docs/PHASE-02-DATABASE.md](docs/PHASE-02-DATABASE.md) | 9 migration Flyway, 17 bảng, 14 entity + 14 repository, 15 quyết định thiết kế, bằng chứng 64/64 check trên PostgreSQL 18.3, cách chạy `mvn test` |
+| [docs/PHASE-03-AUTHENTICATION.md](docs/PHASE-03-AUTHENTICATION.md) | Spring Security: đăng ký/đăng nhập/đăng xuất, ma trận phân quyền 3 role, 17 quyết định thiết kế, tạo ADMIN đầu tiên, SQL gán role, kịch bản kiểm tra bằng tay, FAQ |
 | [docs/ENVIRONMENT-SETUP.md](docs/ENVIRONMENT-SETUP.md) | Cài JDK/Maven/PostgreSQL, tạo DB theo least privilege, biến môi trường, xử lý sự cố |
 | [docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md) | **Cách lấy/cập nhật code về máy**: clone, `git pull`, xử lý conflict, nhánh `main` để nộp bài |
 
@@ -128,22 +140,29 @@ src/main/java/com/yak/minisoc/
 ├── entity/                       # PHASE 2: 3 base class + 14 entity + 11 enum (security/ cho SOC)
 ├── repository/                   # PHASE 2: 14 interface Spring Data JPA
 ├── util/BusinessCodes.java       # PHASE 2: mã ORD-yyyyMMdd-NNNNNN và INC-0001
-├── config/         controller/    dto/          service/    security/
+├── config/                       # PHASE 3: SecurityConfig, BootstrapAdminProperties, AdminBootstrapConfig
+├── controller/                   # PHASE 3: HomeController, AuthController
+├── dto/                          # PHASE 3: RegisterRequest
+├── service/                      # PHASE 3: AuthService
+├── security/                     # PHASE 3: AppRoles, AuthenticatedUser, DatabaseUserDetailsService
+├── validation/                   # PHASE 3: @PasswordMatches (+ validator)
+├── exception/                    # PHASE 3: BusinessException, DuplicateAccountException
 ├── detection/      alert/         incident/     audit/      simulator/
-├── exception/      mapper/        validation/   websocket/
-└──      ↑ các package này có package-info.java (Phase 1) và sẽ được lấp đầy từ Phase 3 trở đi
+├── mapper/         websocket/
+└──      ↑ các package này sẽ được lấp đầy ở các phase sau (detection = Phase 6, simulator = Phase 13…)
 
 src/main/resources/
-├── application.yml          # cấu hình chung (secret đọc từ ENV)
+├── application.yml          # cấu hình chung (secret + bootstrap ADMIN đọc từ ENV)
 ├── application-dev.yml      # log SQL, template cache off, simulator bật
 ├── application-prod.yml     # không có default cho credential, simulator tắt
 ├── db/migration/            # PHASE 2: V1..V9 - nguồn sự thật của schema
-├── templates/               # Thymeleaf (Phase 3+)
-└── static/{css,js,vendor}/  # HTML/CSS/JS thuần (không framework JS)
+├── templates/               # PHASE 3: fragments/layout, index, login, register, error/{403,404,error}
+└── static/{css,js,vendor}/  # PHASE 3: app.css (tự viết, không framework/CSS ngoài) + favicon.svg
 
 src/test/
 ├── resources/application-test.yml   # PHASE 2: profile test (PostgreSQL minisoc_test)
-└── java/…/repository/               # PHASE 2: 6 lớp @DataJpaTest
+└── java/…/                          # PHASE 2: 6 lớp @DataJpaTest
+                                     # PHASE 3: + 8 lớp (SecurityConfigTest, ErrorPageRenderingTest, …)
 
 tools/sql-validation/                # PHASE 2: harness kiểm chứng SQL trên PostgreSQL 18.3
 └── validate.mjs                     # node validate.mjs → 64/64 check

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head th:replace="~{fragments/layout :: head('Không có quyền truy cập')}">
+    <title>403</title>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: nav(false, null, false, false, false)}"></nav>
+
+<main class="page page-narrow">
+    <div class="auth-card error-card">
+        <p class="error-code">403</p>
+        <h1>Bạn không có quyền truy cập trang này</h1>
+
+        <p>
+            Yêu cầu đã bị <strong>Spring Security</strong> từ chối vì tài khoản của bạn
+            không có role cần thiết cho đường dẫn
+            <code th:text="${path} ?: '(không rõ)'">/admin/...</code>.
+        </p>
+
+        <div class="alert alert-info">
+            <strong>Đây không phải lỗi hệ thống — và cũng không phải là vô hình.</strong>
+            <span>
+                Mỗi lần bị từ chối sẽ được ghi lại thành một <code>security_event</code> loại
+                <code>ACCESS_DENIED</code> (Phase 5). Nếu bạn cố truy cập lặp lại nhiều lần,
+                rule <code>UnauthorizedAccessRule</code> (Phase 6) sẽ sinh alert và
+                cảnh báo cho SOC. Nói cách khác: hành vi dò quét bị <em>chặn</em> và bị
+                <em>ghi nhận</em> cùng lúc.
+            </span>
+        </div>
+
+        <div class="cta-row">
+            <a class="btn btn-primary" th:href="@{/}">Về trang chủ</a>
+            <!-- Provided by Spring Security's RequestCache: the page they tried to reach. -->
+            <form th:action="@{/logout}" method="post" class="inline-form">
+                <button type="submit" class="btn btn-outline">Đăng xuất</button>
+            </form>
+        </div>
+
+        <p class="muted small">
+            Nếu bạn cho rằng mình <em>nên</em> có quyền: role của tài khoản nằm trong bảng
+            <code>user_roles</code>. Xem hướng dẫn gán role trong
+            <code>docs/PHASE-03-AUTHENTICATION.md</code>.
+        </p>
+    </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

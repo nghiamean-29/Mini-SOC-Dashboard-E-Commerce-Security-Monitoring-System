@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head th:replace="~{fragments/layout :: head('Trang chủ')}">
+    <title>Trang chủ</title>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: nav(${loggedIn}, ${username}, ${showShopLinks}, ${showSocLinks}, ${showAdminLinks})}"></nav>
+
+<main class="page">
+
+    <!-- ============================================================
+         Hero: what this application is. Shown to everybody.
+         ============================================================ -->
+    <section class="hero">
+        <p class="eyebrow">E-Commerce Security Monitoring</p>
+        <h1>Website thương mại điện tử có <span class="accent">Mini SOC</span> giám sát</h1>
+        <p class="lead">
+            Mọi hành động quan trọng trong shop — đăng nhập, truy cập bị từ chối, đặt hàng —
+            được ghi lại thành <strong>security event</strong>. Các rule phát hiện tấn công
+            (brute force, SQL injection, request flood…) biến những event đó thành
+            <strong>alert</strong>, rồi thành <strong>incident</strong> để analyst điều tra.
+        </p>
+
+        <div class="cta-row" th:unless="${loggedIn}">
+            <a class="btn btn-primary btn-lg" th:href="@{/register}">Tạo tài khoản</a>
+            <a class="btn btn-outline btn-lg" th:href="@{/login}">Đăng nhập</a>
+        </div>
+
+        <div class="cta-row" th:if="${loggedIn}">
+            <a class="btn btn-primary btn-lg" th:if="${showSocLinks}" th:href="@{/soc}">
+                Mở SOC Dashboard
+            </a>
+            <a class="btn btn-outline btn-lg" th:if="${showShopLinks}" th:href="@{/cart}">
+                Giỏ hàng của tôi
+            </a>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         Welcome banner once logged in - and the roles of this account.
+         ============================================================ -->
+    <section class="card" th:if="${loggedIn}">
+        <h2>Xin chào, <span th:text="${username}">bạn</span></h2>
+        <p class="muted">Tài khoản của bạn đang có các quyền:</p>
+        <ul class="tag-list">
+            <li class="tag tag-customer" th:if="${isCustomer}">CUSTOMER — mua hàng</li>
+            <li class="tag tag-admin" th:if="${isAdmin}">ADMIN — quản trị shop + xem SOC</li>
+            <li class="tag tag-analyst" th:if="${isAnalyst}">SOC_ANALYST — giám sát an ninh</li>
+        </ul>
+    </section>
+
+    <!-- ============================================================
+         Pipeline: the story the whole project tells (SDD section 5-9).
+         ============================================================ -->
+    <section class="pipeline">
+        <h2>Dòng chảy dữ liệu an ninh</h2>
+        <ol class="pipeline-steps">
+            <li>
+                <span class="step-no">1</span>
+                <h3>Thu thập</h3>
+                <p>Filter + listener ghi <code>security_events</code>: đăng nhập, 403, thao tác quản trị, đơn hàng.</p>
+            </li>
+            <li>
+                <span class="step-no">2</span>
+                <h3>Phát hiện</h3>
+                <p>5 rule chạy trên cửa sổ trượt trong bộ nhớ: brute force, truy cập trái phép, flood, SQLi, chiếm tài khoản.</p>
+            </li>
+            <li>
+                <span class="step-no">3</span>
+                <h3>Cảnh báo</h3>
+                <p>Alert có mức độ, có bằng chứng (các event gốc) và được khử trùng lặp theo cooldown 5 phút.</p>
+            </li>
+            <li>
+                <span class="step-no">4</span>
+                <h3>Điều tra</h3>
+                <p>Alert cùng nguồn được gom thành incident; analyst gán, ghi chú, resolve và lưu vết audit.</p>
+            </li>
+        </ol>
+    </section>
+
+    <!-- ============================================================
+         Current phase: honest status board so nobody wonders why a link 404s.
+         ============================================================ -->
+    <section class="card">
+        <h2>Trạng thái dự án</h2>
+        <p class="muted">
+            Đang ở <strong>Phase 3 — Authentication &amp; Authorization</strong>.
+            Trang chủ, đăng nhập và đăng ký đã hoạt động; sản phẩm, giỏ hàng và dashboard
+            SOC sẽ lần lượt xuất hiện ở các phase sau.
+        </p>
+        <table class="table">
+            <thead>
+            <tr><th>Phase</th><th>Nội dung</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody>
+            <tr><td>0–2</td><td>Planning · Khởi tạo · Database (9 migration, 17 bảng)</td><td class="ok">Hoàn thành</td></tr>
+            <tr><td>3</td><td>Đăng ký, đăng nhập, phân quyền 3 role</td><td class="wip">Bạn đang xem</td></tr>
+            <tr><td>4</td><td>Sản phẩm, giỏ hàng, đơn hàng</td><td class="todo">Sắp tới</td></tr>
+            <tr><td>5–11</td><td>Security events · Detection · Alert · Incident · Dashboard · Realtime · Simulator</td><td class="todo">Sắp tới</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

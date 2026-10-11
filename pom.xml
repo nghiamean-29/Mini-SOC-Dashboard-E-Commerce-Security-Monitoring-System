@@ -187,10 +187,33 @@
         </dependency>
 
         <!--
+            MockMvc + @WebMvcTest + @AutoConfigureMockMvc (the web slice).
+            Separate from spring-boot-starter-test on purpose: a web slice only makes
+            sense with the MVC stack on the classpath. Requires mockito and hamcrest
+            as well, which the starter above already provides.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Spring Security test support: @WithMockUser, SecurityMockMvcRequestPostProcessors
+            (csrf(), formLogin()), SecurityMockMvcConfigurers.springSecurity().
+            This is what lets the Phase 3 tests ask "what does a CUSTOMER see when they
+            open /admin?" instead of testing the filter chain by hand.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
             Test starters added LATER, in the phase that first needs them
             (declaring unused dependencies is noise):
-              Phase 3 -> spring-boot-starter-webmvc-test    (MockMvc, @WebMvcTest)
-              Phase 3 -> spring-boot-starter-security-test  (@WithMockUser, csrf())
+              (none planned for Phase 4)
             There is deliberately NO in-memory database (H2) dependency: the schema
             uses PostgreSQL features the project depends on (JSONB, nextval(),
             partial indexes, CHECK constraints with regexes). Testing the mapping

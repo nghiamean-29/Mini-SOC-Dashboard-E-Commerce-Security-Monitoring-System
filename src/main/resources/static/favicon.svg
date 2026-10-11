@@ -1,0 +1,24 @@
+<!--
+  The application icon: a shield with a signal ring - "we watch over the shop".
+  SVG instead of PNG because it is one small text file, scales to any size and needs no
+  binary asset in the repository. Served from our own origin, so it satisfies the
+  default-src 'self' rule of the Content-Security-Policy.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Mini SOC">
+    <defs>
+        <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#38bdf8"/>
+            <stop offset="1" stop-color="#0ea5e9"/>
+        </linearGradient>
+    </defs>
+    <!-- shield -->
+    <path d="M16 2 L27 6 v9 c0 7-5 12-11 15 C10 27 5 22 5 15 V6 Z" fill="url(#shield)" opacity="0.18"/>
+    <path d="M16 2 L27 6 v9 c0 7-5 12-11 15 C10 27 5 22 5 15 V6 Z"
+          fill="none" stroke="#38bdf8" stroke-width="2" stroke-linejoin="round"/>
+    <!-- signal arcs (monitoring) -->
+    <path d="M11.5 18.5a6.4 6.4 0 0 1 9 0" fill="none" stroke="#38bdf8" stroke-width="1.8"
+          stroke-linecap="round"/>
+    <path d="M13.6 15.2a3.4 3.4 0 0 1 4.8 0" fill="none" stroke="#7dd3fc" stroke-width="1.8"
+          stroke-linecap="round"/>
+    <circle cx="16" cy="20.6" r="1.7" fill="#7dd3fc"/>
+</svg>

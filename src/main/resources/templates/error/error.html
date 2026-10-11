@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head th:replace="~{fragments/layout :: head('Lỗi hệ thống')}">
+    <title>Lỗi</title>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: nav(false, null, false, false, false)}"></nav>
+
+<main class="page page-narrow">
+    <div class="auth-card error-card">
+        <p class="error-code" th:text="${status} ?: '500'">500</p>
+        <h1>Có lỗi xảy ra</h1>
+
+        <!--
+          SECURITY NOTE - the whole point of this page:
+          Spring Boot is configured (application.yml, server.error.*) to send
+          include-message: never, include-stacktrace: never, include-exception: false.
+          That is why a stack trace, an exception class name or a SQL fragment can
+          never reach the browser: error pages are a classic information-disclosure
+          channel (T4 in the threat model).
+
+          The technical detail goes to the LOG, where the operator can see it - not to
+          the screen, where an attacker could read it.
+        -->
+        <p>
+            Hệ thống không hoàn thành được yêu cầu này. Chi tiết kỹ thuật đã được ghi vào
+            log của ứng dụng (không hiển thị ở đây để tránh lộ thông tin nội bộ).
+        </p>
+
+        <div class="alert alert-info">
+            <strong>Bạn có thể tự kiểm tra:</strong>
+            <span>
+                mở terminal đang chạy <code>mvn spring-boot:run</code> và tìm dòng
+                <code>ERROR</code> gần nhất — đó chính là stack trace mà trang này cố tình
+                không hiển thị.
+            </span>
+        </div>
+
+        <div class="cta-row">
+            <a class="btn btn-primary" th:href="@{/}">Về trang chủ</a>
+        </div>
+
+        <p class="muted small">
+            Mã trạng thái: <span th:text="${status} ?: '500'">500</span>
+            <span th:if="${path}"> · đường dẫn: <code th:text="${path}">/</code></span>
+        </p>
+    </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

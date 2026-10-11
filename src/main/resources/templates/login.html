@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head th:replace="~{fragments/layout :: head('Đăng nhập')}">
+    <title>Đăng nhập</title>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: nav(false, null, false, false, false)}"></nav>
+
+<main class="page page-narrow">
+
+    <div class="auth-card">
+        <header class="auth-header">
+            <h1>Đăng nhập</h1>
+            <p class="muted">Dùng tài khoản của bạn để tiếp tục.</p>
+        </header>
+
+        <!-- ==========================================================
+             Feedback messages.
+             They come from the URL (?error / ?logout / ?expired / ?registered),
+             which is how Spring Security signals the outcome of a login attempt -
+             this controller only renders them.
+             ========================================================== -->
+
+        <div class="alert alert-danger" th:if="${param.error}">
+            <strong>Sai tên đăng nhập hoặc mật khẩu.</strong>
+            <!-- One neutral message for every failure: wrong password, unknown user and
+                 disabled account are indistinguishable to the visitor (no user enumeration). -->
+            <span>Vui lòng kiểm tra lại. Tài khoản bị khoá hoặc bị vô hiệu hoá cũng không thể đăng nhập.</span>
+        </div>
+
+        <div class="alert alert-success" th:if="${param.logout}">
+            Bạn đã đăng xuất. Session đã được huỷ.
+        </div>
+
+        <div class="alert alert-warning" th:if="${param.expired}">
+            Tài khoản này vừa được đăng nhập ở một nơi khác nên phiên cũ đã kết thúc.
+            Nếu không phải bạn, hãy đổi mật khẩu ngay.
+        </div>
+
+        <div class="alert alert-success" th:if="${param.registered}">
+            Tạo tài khoản thành công<span th:if="${registeredUsername}"> cho
+            <strong th:text="${registeredUsername}">username</strong></span>.
+            Hãy đăng nhập bằng tài khoản vừa tạo.
+        </div>
+
+        <!-- ==========================================================
+             The form POSTs to /login, which is handled by Spring Security's
+             UsernamePasswordAuthenticationFilter - NOT by a controller method.
+             The hidden CSRF field is inserted automatically by Thymeleaf because
+             the form action is built with th:action.
+             ========================================================== -->
+        <form th:action="@{/login}" method="post" class="form">
+
+            <div class="field">
+                <label for="username">Tên đăng nhập</label>
+                <input type="text" id="username" name="username"
+                       autocomplete="username" autofocus required
+                       placeholder="ví dụ: yakadmin"/>
+            </div>
+
+            <div class="field">
+                <label for="password">Mật khẩu</label>
+                <input type="password" id="password" name="password"
+                       autocomplete="current-password" required
+                       placeholder="••••••••"/>
+            </div>
+
+            <!-- No "remember me": deliberately left out (SDD 11.1) - a stolen
+                 cookie would stay valid for weeks, which is a bad trade for a demo. -->
+
+            <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
+        </form>
+
+        <p class="auth-alt">
+            Chưa có tài khoản? <a th:href="@{/register}">Đăng ký ngay</a>.
+        </p>
+    </div>
+
+    <aside class="hint-card">
+        <h2>Tài khoản để thử</h2>
+        <p>
+            Phase 2 cố ý <strong>không</strong> seed sẵn user nào (không có mật khẩu mặc định
+            trong repository). Có hai cách để có tài khoản:
+        </p>
+        <ol class="hint-list">
+            <li>
+                <strong>Tự đăng ký</strong> ở <a th:href="@{/register}">/register</a> —
+                tài khoản mới luôn được gán role <code>CUSTOMER</code>.
+            </li>
+            <li>
+                <strong>Tạo admin đầu tiên</strong> bằng biến môi trường trước khi chạy
+                (xem <code>docs/PHASE-03-AUTHENTICATION.md</code>):
+                <pre class="code">export APP_BOOTSTRAP_ADMIN_USERNAME=yakadmin
+export APP_BOOTSTRAP_ADMIN_PASSWORD='MatKhau123'
+export APP_BOOTSTRAP_ADMIN_EMAIL=yakadmin@example.com</pre>
+                Admin được tạo <em>một lần</em> ở lần khởi động đầu tiên; khởi động lại
+                sẽ không tạo trùng và không ghi log mật khẩu.
+            </li>
+        </ol>
+        <p class="muted">
+            Muốn thử role <code>SOC_ANALYST</code>? Dùng câu lệnh SQL trong tài liệu
+            Phase 3 để gán thêm role cho một tài khoản.
+        </p>
+    </aside>
+
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

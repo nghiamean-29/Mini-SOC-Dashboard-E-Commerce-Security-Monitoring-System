@@ -247,6 +247,10 @@ Kỳ vọng: in ra `PostgreSQL 18.x ...`. Nếu bị hỏi mật khẩu → nh�
 | `DB_USERNAME` | `minisoc` | Role của ứng dụng |
 | `DB_PASSWORD` | `DoiMatKhauNay_2026` | Mật khẩu (⚠️ **không** commit vào git) |
 | `APP_SIMULATOR_ENABLED` | `true` (dev) / `false` (prod) | Bật/tắt Attack Simulator |
+| `APP_BOOTSTRAP_ADMIN_USERNAME` | `admin01` | *Tuỳ chọn (từ Phase 3)* — tạo tài khoản ADMIN đầu tiên khi ứng dụng khởi động. Để trống ⇒ không tạo gì (an toàn) |
+| `APP_BOOTSTRAP_ADMIN_PASSWORD` | `Admin@12345` | *Tuỳ chọn* — mật khẩu cho ADMIN đầu tiên. **Không** bắt buộc phải ≥ 8 ký tự như form đăng ký, nhưng nên đặt mạnh |
+| `APP_BOOTSTRAP_ADMIN_EMAIL` | `admin01@example.com` | *Tuỳ chọn* — email của ADMIN đầu tiên (phải hợp lệ, không được trùng) |
+| `APP_BOOTSTRAP_ADMIN_FULL_NAME` | `Quan tri vien` | *Tuỳ chọn* — tên hiển thị |
 | `SPRING_PROFILES_ACTIVE` | `dev` | Chọn profile cấu hình |
 | `TEST_DB_URL` | `jdbc:postgresql://localhost:5432/minisoc_test` | *Tuỳ chọn* — database cho `mvn test` (mặc định đã đúng nếu bạn làm §4.3) |
 | `TEST_DB_USERNAME` | `minisoc` | *Tuỳ chọn* — mặc định lấy theo `DB_USERNAME` |
@@ -259,6 +263,10 @@ $env:DB_URL="jdbc:postgresql://localhost:5432/minisoc_db"
 $env:DB_USERNAME="minisoc"
 $env:DB_PASSWORD="DoiMatKhauNay_2026"
 $env:SPRING_PROFILES_ACTIVE="dev"
+# Tuỳ chọn (Phase 3): tạo tài khoản ADMIN đầu tiên — chỉ tạo khi tài khoản CHƯA tồn tại
+# $env:APP_BOOTSTRAP_ADMIN_USERNAME="admin01"
+# $env:APP_BOOTSTRAP_ADMIN_PASSWORD="Admin@12345"
+# $env:APP_BOOTSTRAP_ADMIN_EMAIL="admin01@example.com"
 ```
 
 Đặt vĩnh viễn (áp dụng cho các lần mở terminal sau — cần mở lại terminal):
@@ -276,6 +284,10 @@ export DB_URL="jdbc:postgresql://localhost:5432/minisoc_db"
 export DB_USERNAME="minisoc"
 export DB_PASSWORD="DoiMatKhauNay_2026"
 export SPRING_PROFILES_ACTIVE="dev"
+# Tuỳ chọn (Phase 3): tạo tài khoản ADMIN đầu tiên — chỉ tạo khi tài khoản CHƯA tồn tại
+# export APP_BOOTSTRAP_ADMIN_USERNAME="admin01"
+# export APP_BOOTSTRAP_ADMIN_PASSWORD="Admin@12345"
+# export APP_BOOTSTRAP_ADMIN_EMAIL="admin01@example.com"
 ```
 Thêm vào `~/.bashrc` / `~/.zshrc` nếu muốn giữ vĩnh viễn (⚠️ nhớ rằng file này có mật khẩu ⇒ **không** đưa vào git, và đừng làm vậy trên máy dùng chung).
 

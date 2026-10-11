@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<!--
+  Reusable page parts (Thymeleaf fragments).
+
+  WHY FRAGMENTS AND NOT AN EXTRA LAYOUT LIBRARY:
+    Thymeleaf 3 has "fragment expressions" built in: ~{fragments/layout :: head('x')}
+    inserts a piece of another template and passes arguments. That covers what this
+    project needs (head, navigation, footer) with no extra dependency - important
+    because every additional library must be kept compatible with Spring Boot 4, and a
+    project with Content-Security-Policy default-src 'self' cannot pull one from a CDN.
+
+  HOW IT IS USED (see index.html):
+      <head th:replace="~{fragments/layout :: head('Mini SOC Dashboard')}"> ... </head>
+      <nav  th:replace="~{fragments/layout :: nav(${loggedIn}, ${username},
+                                                 ${showShopLinks}, ${showSocLinks}, ${showAdminLinks})}">
+      <footer th:replace="~{fragments/layout :: footer}"> ... </footer>
+
+  WHY nav() TAKES PARAMETERS INSTEAD OF READING THE MODEL DIRECTLY:
+    The navigation depends on who is logged in. On pages whose controller does not
+    publish those flags (login, register, the error pages) a missing model variable
+    would be null - and null inside a Thymeleaf/SpEL boolean expression is not "false",
+    it is an evaluation error. Requiring every caller to state the flags explicitly
+    makes the contract impossible to break by accident:
+
+        guest page   ->  nav(false, null, false, false, false)
+        index page   ->  nav(${loggedIn}, ${username}, ...)   (set by HomeController)
+
+    The same reasoning explains why the templates use th:if / th:unless instead of
+    th:if="${not x}": unless inverts the result in Java code after evaluation, so a null
+    value simply fails the condition - it can never explode.
+
+  The element carrying th:replace is REPLACED by the fragment, which is why the
+  placeholder markup below never reaches the browser; it only keeps the file valid HTML.
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<body>
+
+<!-- =====================================================================
+     head(title) - meta, title, stylesheet
+     ===================================================================== -->
+<head th:fragment="head(pageTitle)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <!-- Same-origin only: this application never calls a third party API, so the
+         browser is told not to leak the current URL to anybody. -->
+    <meta name="referrer" content="same-origin"/>
+    <title th:text="${pageTitle} + ' · Mini SOC'">Mini SOC</title>
+    <!-- Relative URL: works wherever the application is deployed, and satisfies the
+         'self' rule of the Content-Security-Policy. -->
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}"/>
+</head>
+
+<!-- =====================================================================
+     nav(loggedIn, username, showShopLinks, showSocLinks, showAdminLinks)
+     ===================================================================== -->
+<nav th:fragment="nav(loggedIn, username, showShopLinks, showSocLinks, showAdminLinks)" class="topbar">
+    <div class="topbar-inner">
+        <a class="brand" th:href="@{/}">
+            <span class="brand-mark" aria-hidden="true">SOC</span>
+            <span class="brand-text">Mini SOC <small>E-Commerce Monitoring</small></span>
+        </a>
+
+        <div class="topbar-links">
+            <a th:href="@{/}">Trang chủ</a>
+
+            <!-- Shop links: CUSTOMER and ADMIN (matrix in SDD 11.2). -->
+            <a th:if="${showShopLinks}" th:href="@{/cart}">Giỏ hàng</a>
+            <a th:if="${showShopLinks}" th:href="@{/orders}">Đơn hàng</a>
+
+            <!-- SOC and admin links: SOC_ANALYST or ADMIN. -->
+            <a th:if="${showSocLinks}" th:href="@{/soc}">SOC Dashboard</a>
+            <a th:if="${showAdminLinks}" th:href="@{/admin}">Quản trị</a>
+        </div>
+
+        <div class="topbar-user">
+            <th:block th:if="${loggedIn}">
+                <span class="user-chip" th:text="${username}">username</span>
+                <!-- Logout is a POST form with a CSRF token, never a link:
+                     /logout is POST-only (see SecurityConfig). -->
+                <form th:action="@{/logout}" method="post" class="inline-form">
+                    <button type="submit" class="btn btn-ghost">Đăng xuất</button>
+                </form>
+            </th:block>
+            <th:block th:unless="${loggedIn}">
+                <a class="btn btn-ghost" th:href="@{/login}">Đăng nhập</a>
+                <a class="btn btn-primary" th:href="@{/register}">Đăng ký</a>
+            </th:block>
+        </div>
+    </div>
+</nav>
+
+<!-- =====================================================================
+     footer
+     ===================================================================== -->
+<footer th:fragment="footer" class="footer">
+    <div class="footer-inner">
+        <p>
+            <strong>Mini SOC Dashboard</strong> — đồ án môn Lập trình Java nâng cao.
+            Ứng dụng mô phỏng giám sát an ninh cho một website thương mại điện tử.
+        </p>
+        <p class="muted">
+            Mọi dữ liệu tấn công trong hệ thống này là <em>mô phỏng nội bộ</em> do Attack Simulator sinh ra.
+            Không có hành vi tấn công nào được thực hiện ra bên ngoài.
+        </p>
+    </div>
+</footer>
+
+</body>
+</html>

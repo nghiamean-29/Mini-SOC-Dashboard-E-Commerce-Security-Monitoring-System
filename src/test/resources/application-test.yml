@@ -58,8 +58,14 @@ spring:
     # Never let a test run wipe a database by accident.
     clean-disabled: true
 
-  # No web server, no Thymeleaf, no security: a slice test only needs the
-  # persistence layer. (This is what makes 'mvn test' fast.)
+  # NOTE (Phase 3): this profile is shared by two kinds of test.
+  #   * Slice tests (@DataJpaTest) start only the persistence layer - fast.
+  #   * Full-context tests (SecurityConfigTest, ErrorPageRenderingTest) start the
+  #     web layer + security + Thymeleaf on top of the same database, because the
+  #     filter chain and the templates are exactly what they verify.
+  # Some projects disable the web server or security here to speed slices up; this
+  # project keeps one honest configuration for both, so a green run means the real
+  # application configuration works.
   main:
     banner-mode: off
 
