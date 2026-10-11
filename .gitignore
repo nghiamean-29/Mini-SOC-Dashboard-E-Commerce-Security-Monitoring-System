@@ -1,0 +1,62 @@
+# =============================================================================
+# Mini SOC Dashboard - .gitignore
+# Rule of thumb: build output, IDE files, runtime data and SECRETS never enter
+# the repository. Secrets are the most dangerous of the four (NFR-SEC-02).
+# =============================================================================
+
+# ---------------------------------------------------------------- Build output
+target/
+build/
+*.jar
+*.war
+*.ear
+*.class
+# ...but the Maven wrapper jar (if we ever add it) must be tracked
+!.mvn/wrapper/maven-wrapper.jar
+
+# ------------------------------------------------------------------- IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+nbproject/private/
+.nb-gradle/
+
+# ---------------------------------------------------------------- OS junk files
+.DS_Store
+.AppleDouble
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------- SECRETS
+# Real environment files are NEVER committed: they contain the database password.
+# Only the *.example templates (fake values) are tracked.
+.env
+.env.*
+!.env.example
+config/env/*.env
+!config/env/*.env.example
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+
+# ------------------------------------------------------------ Logs and runtime
+logs/
+*.log
+*.log.*
+# Local database artifacts (we use PostgreSQL, but this avoids accidents)
+*.mv.db
+*.trace.db
+*.sqlite
+
+# --------------------------------------------------------------------- Reports
+target/site/
+dependency-reduced-pom.xml
+*.hprof

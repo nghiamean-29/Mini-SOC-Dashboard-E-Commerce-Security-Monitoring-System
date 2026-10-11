@@ -1,0 +1,137 @@
+# =============================================================================
+# Mini SOC Dashboard - configuration shared by ALL profiles
+# -----------------------------------------------------------------------------
+# RULE: no credential is ever written in this file. Values come from environment
+# variables (see docs/ENVIRONMENT-SETUP.md) so nothing sensitive can leak
+# through the repository (NFR-SEC-02).
+#
+# Syntax used below:  ${ENV_VAR:default}
+#   -> use the environment variable when it exists, otherwise the default.
+#   -> ${ENV_VAR} (no default) = the application REFUSES to start when missing.
+# =============================================================================
+spring:
+
+  application:
+    name: mini-soc-dashboard
+
+  # ------------------------------------------------------------------ Database
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/minisoc_db}
+    username: ${DB_USERNAME:minisoc}
+    # Empty default ON PURPOSE: never start with a guessed password.
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: minisoc-pool
+      # 10 connections is plenty for one student machine and one database.
+      maximum-pool-size: 10
+      # Fail fast instead of hanging forever when PostgreSQL is down.
+      connection-timeout: 5000
+      # SQL logs are enabled per-profile, not here.
+
+  # ------------------------------------------------------------- JPA/Hibernate
+  jpa:
+    hibernate:
+      # 'validate': Flyway owns the schema, Hibernate only verifies that the
+      # entities match the tables. Never 'create'/'update' in a security project
+      # because implicit DDL cannot be reviewed or audited.
+      ddl-auto: validate
+    # false = the Hibernate session is closed when the service method ends.
+    # Lazy loading during Thymeleaf rendering is a BUG, not a feature: we want
+    # it to fail loudly in development instead of silently issuing extra queries.
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          # Timestamps are always handled in UTC (NFR-DATA-01); the view layer
+          # converts to Asia/Ho_Chi_Minh for display only.
+          time_zone: UTC
+
+  # -------------------------------------------------------------------- Flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Do NOT baseline automatically: a fresh database must get a clean, auditable
+    # migration history instead of a "baseline" shortcut.
+    baseline-on-migrate: false
+    validate-on-migrate: true
+
+  # ----------------------------------------------------------------- Thymeleaf
+  thymeleaf:
+    # true = production behaviour (templates are cached and fast).
+    # The 'dev' profile turns caching off so you can edit HTML and just refresh.
+    cache: true
+
+# =============================================================================
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        # JavaScript cannot read the session cookie (blocks document.cookie theft)
+        http-only: true
+        # Do not send the cookie on cross-site requests (classic CSRF defence)
+        same-site: lax
+  error:
+    # Never leak exception messages, stack traces or exception class names to
+    # the browser: error pages must not become an information-disclosure channel.
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+
+# =============================================================================
+# Application-specific settings, bound to Java classes with @ConfigurationProperties.
+app:
+  simulator:
+    # The Attack Simulator is a demo/testing tool: OFF unless a profile enables it.
+    enabled: ${APP_SIMULATOR_ENABLED:false}
+
+  security:
+    detection:
+      # Thresholds of the detection rules (FR-DET-07: configurable, never
+      # hard-coded). They are bound to a @ConfigurationProperties class in
+      # Phase 6, when the Detection Engine is implemented.
+      brute-force:
+        threshold: 5            # more than 5 failed logins ...
+        window: 1m              # ... from one IP inside one minute
+      unauthorized-access:
+        threshold: 3            # 3 forbidden requests to /admin/** ...
+        window: 5m              # ... inside five minutes
+      request-flood:
+        threshold: 100          # more than 100 requests ...
+        window: 1m              # ... from one IP inside one minute
+      suspicious-account:
+        window: 30m             # correlation window for the account-takeover chain
+      # Cooldown that collapses repeated alerts of the same type/IP into one
+      # alert with a higher relatedEventCount (D-5, FR-ALR-03).
+      alert-cooldown: 5m
+
+# =============================================================================
+# Actuator: expose the minimum. Phase 3 restricts /actuator/** to the ADMIN role.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # 'never' = do not expose database/disk details to unauthenticated callers
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+# Values injected by Maven resource filtering ('@...@' delimiter configured by
+# spring-boot-starter-parent) so /actuator/info always shows the real version.
+info:
+  app:
+    name: '@project.name@'
+    version: '@project.version@'
+    description: 'Mini SOC Dashboard - E-Commerce Security Monitoring System'
+
+# =============================================================================
+logging:
+  level:
+    root: INFO
+    com.yak.minisoc: INFO
