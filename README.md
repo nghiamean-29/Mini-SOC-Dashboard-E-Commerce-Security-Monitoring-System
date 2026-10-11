@@ -24,6 +24,16 @@ Theo quy tắc SDD (§20): mỗi lần chỉ thực hiện **một phase**, kế
 
 ## 🚀 QUICK START
 
+### 0. Lấy code về máy (làm một lần)
+
+```bash
+git clone https://github.com/nghiamean-29/Mini-SOC-Dashboard-E-Commerce-Security-Monitoring-System.git
+cd Mini-SOC-Dashboard-E-Commerce-Security-Monitoring-System
+git checkout arena/01a0c33c-mini-soc-dashboard-e-commerce
+```
+
+**Cập nhật về sau:** `git pull --ff-only` (chi tiết + xử lý sự cố: **[docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md)**)
+
 ### Yêu cầu môi trường
 
 | Thành phần | Version | Bắt buộc |
@@ -78,6 +88,7 @@ Kiểm tra: <http://localhost:8080/actuator/health> → `{"status":"UP"}`
 | [docs/PHASE-0-PLANNING.md](docs/PHASE-0-PLANNING.md) | Requirements, Actors, Use Cases, Architecture, Database overview, Security architecture, Roadmap, Risks, ADR |
 | [docs/PHASE-01-INITIALIZATION.md](docs/PHASE-01-INITIALIZATION.md) | Giải thích `pom.xml`, cấu hình, cấu trúc package, test; 6 khác biệt của Spring Boot 4; cách kiểm chứng |
 | [docs/ENVIRONMENT-SETUP.md](docs/ENVIRONMENT-SETUP.md) | Cài JDK/Maven/PostgreSQL, tạo DB theo least privilege, biến môi trường, xử lý sự cố |
+| [docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md) | **Cách lấy/cập nhật code về máy**: clone, `git pull`, xử lý conflict, nhánh `main` để nộp bài |
 
 `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md`, `API.md` sẽ được tạo ở **Phase 14** (theo SDD §14).
 
