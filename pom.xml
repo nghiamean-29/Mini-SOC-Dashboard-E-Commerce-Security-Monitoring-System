@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        PARENT = spring-boot-starter-parent (a remote parent, not an in-repo one).
+
+        What the parent gives us:
+          1. Dependency management (the "BOM"): every dependency below can be
+             declared WITHOUT a <version>, so all Spring/Hibernate/Flyway/Jackson
+             versions stay consistent. Upgrading Spring Boot upgrades them all.
+          2. Plugin management: spring-boot-maven-plugin, surefire, compiler.
+          3. maven.compiler.release = ${java.version} (see <properties>).
+          4. Resource filtering for application*.yml using the '@...@' delimiter,
+             so we can inject the Maven project version into application.yml.
+
+        <relativePath/> (empty) means: never look for the parent inside this
+        repository, always download it from the Maven repository.
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.yak</groupId>
+    <artifactId>mini-soc-dashboard</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>Mini SOC Dashboard</name>
+    <description>E-Commerce Security Monitoring System - Mini SOC (Java 21 + Spring Boot 4.1)</description>
+
+    <properties>
+        <!--
+            Spring Boot 4.1 supports Java 17..26. We build with the Java 21 LTS.
+            The parent maps this single property to maven.compiler.release,
+            so the bytecode target is 21 as well.
+        -->
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+
+        <!-- ================================================================
+             1) WEB / VIEW LAYER  (Thymeleaf + Spring MVC, no JavaScript framework)
+             ================================================================ -->
+
+        <!--
+            Spring MVC + embedded Tomcat + Jackson (JSON).
+            NOTE for Spring Boot 4: 'spring-boot-starter-web' is DEPRECATED and
+            renamed to 'spring-boot-starter-webmvc' (same content: MVC + Tomcat +
+            Jackson + HTTP message converters). Use the new name on Boot 4.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+
+        <!--
+            Server-side HTML rendering. Templates live in src/main/resources/templates.
+            Frontend = Thymeleaf + HTML + CSS + a minimum of plain JavaScript.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <!--
+            WebSocket support (spring-websocket + spring-messaging) used by the
+            realtime SOC dashboard over STOMP (Phase 10).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <!-- ================================================================
+             2) SECURITY
+             ================================================================ -->
+
+        <!-- Authentication, authorization (RBAC), BCrypt, CSRF, session handling. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!--
+            Bean Validation (Jakarta Validation API + Hibernate Validator).
+            Powers @Valid / @NotNull / @Size ... on DTOs so that request data is
+            validated at the boundary of the application.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ================================================================
+             3) PERSISTENCE
+             ================================================================ -->
+
+        <!--
+            Spring Data JPA + Hibernate ORM. Also brings spring-boot-starter-jdbc
+            (HikariCP connection pool) transitively.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!--
+            Flyway database migrations. Spring Boot 4 introduced this starter;
+            it brings flyway-core plus spring-boot-starter-jdbc transitively.
+            The schema is created ONLY by migration scripts under
+            src/main/resources/db/migration (never by hand, never by Hibernate).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+
+        <!--
+            REQUIRED since Flyway 10: database support is modular.
+            Spring Boot declares this artifact as OPTIONAL, so it is NOT pulled in
+            transitively. Without it Flyway fails at startup with
+            "Unsupported Database: PostgreSQL". Version comes from the parent BOM.
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- PostgreSQL JDBC driver. Runtime scope: we never compile against it. -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ================================================================
+             4) OPERATIONS / OBSERVABILITY
+             ================================================================ -->
+
+        <!--
+            Actuator: /actuator/health (lets us verify the database connection in
+            Phase 1 without writing any UI) and /actuator/info.
+            Phase 3 restricts these endpoints to the ADMIN role.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- ================================================================
+             5) TESTING
+             ================================================================ -->
+
+        <!--
+            JUnit 5 (Jupiter) + Mockito + AssertJ + Hamcrest + Awaitility +
+            JsonPath + spring-test.
+            Awaitility ships with this starter, which we will use to test
+            asynchronous code (event pipeline, WebSocket) without Thread.sleep.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            @DataJpaTest slices + TestEntityManager + AssertJ database assertions.
+            WHY A SEPARATE STARTER (instead of putting it in spring-boot-starter-test):
+            a JPA slice is only useful when the persistence layer is on the classpath,
+            so Spring Boot 4 ships one *-test starter per technology. Adding it here
+            keeps the slice tests of Phase 2 self-contained: no @SpringBootTest, no
+            web server, no security filter chain - just the entities, the repositories
+            and a real database.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            MockMvc + @WebMvcTest + @AutoConfigureMockMvc (the web slice).
+            Separate from spring-boot-starter-test on purpose: a web slice only makes
+            sense with the MVC stack on the classpath. Requires mockito and hamcrest
+            as well, which the starter above already provides.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Spring Security test support: @WithMockUser, SecurityMockMvcRequestPostProcessors
+            (csrf(), formLogin()), SecurityMockMvcConfigurers.springSecurity().
+            This is what lets the Phase 3 tests ask "what does a CUSTOMER see when they
+            open /admin?" instead of testing the filter chain by hand.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Test starters added LATER, in the phase that first needs them
+            (declaring unused dependencies is noise):
+              (none planned for Phase 4)
+            There is deliberately NO in-memory database (H2) dependency: the schema
+            uses PostgreSQL features the project depends on (JSONB, nextval(),
+            partial indexes, CHECK constraints with regexes). Testing the mapping
+            against a database that accepts the SQL only by accident would hide
+            exactly the bugs these tests exist to find; tests run against a real
+            PostgreSQL database (see src/test/resources/application-test.yml).
+        -->
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                spring-boot-maven-plugin: adds the 'repackage' goal, which turns
+                the plain jar into an executable jar (java -jar target/*.jar).
+                No configuration needed: the main class is detected automatically
+                because there is exactly one @SpringBootApplication class.
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

@@ -1,0 +1,45 @@
+# =============================================================================
+# Profile: prod  (production-like settings)
+#
+# Every credential comes from the environment and has NO default value:
+# if a variable is missing the application FAILS AT STARTUP.
+# Failing fast is safer than silently running with a guessed credential.
+# =============================================================================
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  thymeleaf:
+    cache: true
+
+server:
+  servlet:
+    session:
+      cookie:
+        # In production the application sits behind HTTPS (reverse proxy),
+        # so the session cookie must only travel over TLS.
+        secure: true
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+
+app:
+  simulator:
+    # The Attack Simulator must NEVER be reachable in production.
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: WARN
+    com.yak.minisoc: INFO

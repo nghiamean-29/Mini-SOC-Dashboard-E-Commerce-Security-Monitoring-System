@@ -1,0 +1,76 @@
+# =============================================================================
+# Test configuration (profile "test"), loaded by every @DataJpaTest slice.
+# -----------------------------------------------------------------------------
+# WHY TESTS RUN AGAINST POSTGRESQL AND NOT AGAINST H2
+#
+#   The schema is not "generic SQL": it uses JSONB with a GIN index, nextval() on
+#   two sequences, partial indexes for the SOC dashboard, CHECK constraints with
+#   regular expressions, and TIMESTAMPTZ. An in-memory database would either
+#   refuse the migrations or accept them while behaving differently - and a test
+#   that passes against a different database proves nothing about production.
+#
+#   So the tests use a REAL PostgreSQL database: "minisoc_test".
+#   Create it once (see docs/PHASE-02-DATABASE.md, section "Prepare the test
+#   database"), it is intentionally separate from minisoc_db so that running
+#   'mvn test' can never touch the data you use in the shop.
+# =============================================================================
+
+spring:
+
+  datasource:
+    # Overridable, exactly like the main configuration (NFR-SEC-02: no secret in
+    # a file under version control - the password comes from the environment).
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/minisoc_test}
+    username: ${TEST_DB_USERNAME:${DB_USERNAME:minisoc}}
+    password: ${TEST_DB_PASSWORD:${DB_PASSWORD:}}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: minisoc-test-pool
+      # Fewer connections than production: a slice test is a single thread.
+      maximum-pool-size: 4
+      connection-timeout: 5000
+
+  jpa:
+    hibernate:
+      # 'validate' says: Flyway creates the schema (the migration files are the
+      # single source of truth), Hibernate only checks that every entity matches
+      # the real tables. A wrong column name, a wrong type or a missing column
+      # therefore fails the test run at startup - with the entity and column
+      # names in the message - instead of failing later at runtime.
+      #
+      # If a future PostgreSQL/Hibernate version reports a type mismatch that is
+      # only cosmetic (for example around jsonb), switch this to 'none': the
+      # tests themselves still execute real SQL on the real schema.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          # Same rule as the application: timestamps are UTC everywhere.
+          time_zone: UTC
+
+  flyway:
+    # The migrations run for real, so the test database gets the same schema as
+    # production (including V9, which seeds the three roles the tests rely on).
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    # Never let a test run wipe a database by accident.
+    clean-disabled: true
+
+  # NOTE (Phase 3): this profile is shared by two kinds of test.
+  #   * Slice tests (@DataJpaTest) start only the persistence layer - fast.
+  #   * Full-context tests (SecurityConfigTest, ErrorPageRenderingTest) start the
+  #     web layer + security + Thymeleaf on top of the same database, because the
+  #     filter chain and the templates are exactly what they verify.
+  # Some projects disable the web server or security here to speed slices up; this
+  # project keeps one honest configuration for both, so a green run means the real
+  # application configuration works.
+  main:
+    banner-mode: off
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+    # Flyway prints which migration ran - useful the first time the tests run.
+    org.flywaydb: info

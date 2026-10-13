@@ -1,0 +1,29 @@
+# =============================================================================
+# Profile: dev
+# Run with:  SPRING_PROFILES_ACTIVE=dev  (or  mvn spring-boot:run -Dspring-boot.run.profiles=dev)
+#
+# Purpose: maximum visibility while learning.
+# NEVER use this profile in production: it logs SQL and enables the simulator.
+# =============================================================================
+spring:
+  thymeleaf:
+    # No template cache: edit src/main/resources/templates/**.html, then refresh
+    # the browser (with spring-boot-devtools it reloads without restarting).
+    cache: false
+
+logging:
+  level:
+    com.yak.minisoc: DEBUG
+    # SQL statements produced by Hibernate.
+    org.hibernate.SQL: DEBUG
+    # Parameter values bound into the SQL. Handy, but it prints user data, so it
+    # stays COMMENTED OUT even in dev: see NFR-OBS-02 (never log sensitive data).
+    # org.hibernate.orm.jdbc.bind: TRACE
+    org.springframework.security: INFO
+    # Show which auto-configuration classes were applied (useful when learning)
+    # org.springframework.boot.autoconfigure: DEBUG
+
+app:
+  simulator:
+    # The Attack Simulator (Phase 11) is a demo tool and must be available here.
+    enabled: true
