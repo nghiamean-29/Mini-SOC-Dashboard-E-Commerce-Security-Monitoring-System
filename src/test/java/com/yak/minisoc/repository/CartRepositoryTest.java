@@ -19,7 +19,7 @@ import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
-
+import org.hibernate.exception.ConstraintViolationException;
 /**
  * Persistence tests for the cart aggregate: {@link CartRepository} and
  * {@link CartItemRepository}.
@@ -132,7 +132,7 @@ class CartRepositoryTest {
                     .setParameter("productId", product.getId())
                     .executeUpdate();
             em.flush();
-        }).isInstanceOf(DataIntegrityViolationException.class);
+        }).isInstanceOf(ConstraintViolationException.class);
     }
 
     @Test

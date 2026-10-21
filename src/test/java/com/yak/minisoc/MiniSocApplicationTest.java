@@ -30,8 +30,8 @@ class MiniSocApplicationTest {
     @DisplayName("is annotated with @SpringBootApplication")
     void isAnnotatedWithSpringBootApplication() {
         assertThat(MiniSocApplication.class.isAnnotationPresent(SpringBootApplication.class))
-                .as("@SpringBootApplication is required to enable auto-configuration and component scanning")
-                .isTrue();
+            .as("@SpringBootApplication is required to enable auto-configuration and component scanning")
+            .isTrue();
     }
 
     @Test
@@ -41,11 +41,11 @@ class MiniSocApplicationTest {
 
         assertThat(MiniSocApplication.class.getPackageName()).isEqualTo("com.yak.minisoc");
         assertThat(annotation.scanBasePackages())
-                .as("no explicit base package: every com.yak.minisoc.* package is scanned")
-                .isEmpty();
+            .as("no explicit base package: every com.yak.minisoc.* package is scanned")
+            .isEmpty();
         assertThat(annotation.scanBasePackageClasses())
-                .as("no explicit base package class: scanning starts at com.yak.minisoc")
-                .isEmpty();
+            .as("no explicit base package class: scanning starts at com.yak.minisoc")
+            .isEmpty();
     }
 
     @Test

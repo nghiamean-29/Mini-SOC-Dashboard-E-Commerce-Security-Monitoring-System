@@ -17,9 +17,9 @@ spring:
   # ------------------------------------------------------------------ Database
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/minisoc_db}
-    username: ${DB_USERNAME:minisoc}
+    username: ${DB_USERNAME:postgres}
     # Empty default ON PURPOSE: never start with a guessed password.
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: minisoc-pool
