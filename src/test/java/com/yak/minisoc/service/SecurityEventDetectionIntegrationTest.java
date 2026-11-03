@@ -11,10 +11,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,8 +31,15 @@ class SecurityEventDetectionIntegrationTest {
     @Autowired
     private SecurityAlertRepository alertRepository;
 
-    // Generate a test IP that is unlikely to be reused
-    // across Maven test executions.
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    // Unique identifier for each test method.
+    private final String testId = UUID.randomUUID().toString();
+
     private String uniqueIp() {
         int value = ThreadLocalRandom.current()
             .nextInt(1, 65535);
@@ -45,8 +55,6 @@ class SecurityEventDetectionIntegrationTest {
         String sourceIp,
         int count,
         boolean simulated) {
-
-        String testId = UUID.randomUUID().toString();
 
         for (int i = 0; i < count; i++) {
             eventService.recordEvent(
@@ -74,6 +82,93 @@ class SecurityEventDetectionIntegrationTest {
             .filter(alert ->
                 alert.getAlertType() == alertType)
             .toList();
+    }
+
+    // ==========================================
+    // CLEANUP AFTER EACH TEST
+    // ==========================================
+
+    @AfterEach
+    void cleanupTestData() {
+
+        String databaseName = jdbcTemplate.queryForObject(
+            "SELECT current_database()",
+            String.class
+        );
+
+        if (!"minisoc_test".equals(databaseName)) {
+            throw new IllegalStateException(
+                "Cleanup is allowed only on minisoc_test. "
+                    + "Current database: " + databaseName
+            );
+        }
+
+        transactionTemplate.executeWithoutResult(status -> {
+
+            // Find alerts whose linked events belong
+            // exclusively to this test.
+            List<Long> alertIds = jdbcTemplate.queryForList("""
+                SELECT DISTINCT ae.alert_id
+                FROM alert_events ae
+                JOIN security_events se
+                    ON se.id = ae.event_id
+                WHERE se.metadata ->> 'testId' = ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM alert_events other_ae
+                      JOIN security_events other_se
+                          ON other_se.id = other_ae.event_id
+                      WHERE other_ae.alert_id = ae.alert_id
+                        AND (
+                            other_se.metadata ->> 'testId'
+                        ) IS DISTINCT FROM ?
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM incident_alerts ia
+                      WHERE ia.alert_id = ae.alert_id
+                  )
+                """,
+                Long.class,
+                testId,
+                testId
+            );
+
+            // Remove event-alert links created by this test.
+            jdbcTemplate.update("""
+                DELETE FROM alert_events
+                WHERE event_id IN (
+                    SELECT id
+                    FROM security_events
+                    WHERE metadata ->> 'testId' = ?
+                )
+                """, testId);
+
+            // Remove alerts identified above,
+            // provided they have no remaining links.
+            for (Long alertId : alertIds) {
+                jdbcTemplate.update("""
+                    DELETE FROM security_alerts
+                    WHERE id = ?
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM alert_events
+                          WHERE alert_id = ?
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM incident_alerts
+                          WHERE alert_id = ?
+                      )
+                    """, alertId, alertId, alertId);
+            }
+
+            // Remove events belonging to this test.
+            jdbcTemplate.update("""
+                DELETE FROM security_events
+                WHERE metadata ->> 'testId' = ?
+                """, testId);
+        });
     }
 
     // ==========================================
@@ -181,7 +276,6 @@ class SecurityEventDetectionIntegrationTest {
             findAlerts(ip, AlertType.BRUTE_FORCE)
         ).hasSize(1);
 
-        // More events within the cooldown window.
         recordEvents(
             SecurityEventType.LOGIN_FAILED,
             ip,
