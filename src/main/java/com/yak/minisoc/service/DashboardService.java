@@ -1,13 +1,14 @@
 
 package com.yak.minisoc.service;
 
+import com.yak.minisoc.entity.security.AlertStatus;
+import com.yak.minisoc.repository.SecurityAlertRepository;
 import com.yak.minisoc.repository.SecurityEventRepository;
 import com.yak.minisoc.repository.SecurityIncidentRepository;
 import com.yak.minisoc.repository.UserRepository;
-import com.yak.minisoc.repository.SecurityAlertRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.yak.minisoc.entity.security.AlertStatus;
+
 @Service
 public class DashboardService {
 
@@ -28,27 +29,32 @@ public class DashboardService {
         this.userRepository = userRepository;
     }
 
-
     @Transactional(readOnly = true)
     public DashboardStats getStats() {
+
+        long securityEvents = eventRepository.count();
+
+        long securityIncidents = incidentRepository.count();
 
         long activeAlerts =
             alertRepository.countByStatus(AlertStatus.OPEN)
                 + alertRepository.countByStatus(AlertStatus.INVESTIGATING);
 
+        long users = userRepository.count();
+
         return new DashboardStats(
-            eventRepository.count(),
-            incidentRepository.count(),
+            securityEvents,
+            securityIncidents,
             activeAlerts,
-            userRepository.count()
+            users
         );
     }
-
 
     public record DashboardStats(
         long securityEvents,
         long securityIncidents,
         long activeAlerts,
         long users
-    ) {}
+    ) {
+    }
 }

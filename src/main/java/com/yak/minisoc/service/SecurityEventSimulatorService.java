@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +25,6 @@ public class SecurityEventSimulatorService {
 
     private final SecurityEventRepository eventRepository;
     private final UserRepository userRepository;
-
-    // ==========================================
-    // CONSTRUCTOR
-    // ==========================================
 
     public SecurityEventSimulatorService(
         SecurityEventRepository eventRepository,
@@ -39,36 +38,54 @@ public class SecurityEventSimulatorService {
     // GENERATE DEMO SECURITY EVENTS
     // ==========================================
 
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
-    public int generateDemoEvents(Long currentUserId) {
+    public int generateDemoEvents() {
 
-        // 1. Validate user ID
-        if (currentUserId == null) {
+        // 1. Lay tai khoan tu Spring Security
+        Authentication authentication =
+            SecurityContextHolder.getContext()
+                .getAuthentication();
+
+        if (authentication == null
+            || !authentication.isAuthenticated()
+            || "anonymousUser".equals(authentication.getPrincipal())) {
+
             throw new SecurityException(
                 "Chua xac dinh tai khoan dang nhap."
             );
         }
 
-        // 2. Load user from PostgreSQL
-        User user = userRepository.findById(currentUserId)
-            .orElseThrow(() ->
-                new SecurityException(
-                    "Tai khoan khong ton tai."
-                )
-            );
+        String username = authentication.getName();
 
-        // 3. Check account status
+        // 2. Tim user trong PostgreSQL
+        User user = userRepository
+            .findWithRolesByUsername(username)
+            .orElseThrow(() -> new SecurityException(
+                "Tai khoan khong ton tai."
+            ));
+
+        // 3. Kiem tra trang thai tai khoan
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new SecurityException(
                 "Tai khoan khong con hoat dong."
             );
         }
 
-        // 4. Check ADMIN role
-        // Roles are LAZY, but accessible inside this transaction.
-        if (!user.hasRole("ADMIN")) {
+        // 4. Kiem tra quyen ADMIN
+        if (!authentication.getAuthorities().stream()
+            .anyMatch(authority ->
+                "ROLE_ADMIN".equals(
+                    authority.getAuthority()))) {
+
             throw new SecurityException(
                 "Chi ADMIN moi duoc tao su kien demo."
+            );
+        }
+
+        if (!user.hasRole("ADMIN")) {
+            throw new SecurityException(
+                "Tai khoan khong co quyen ADMIN."
             );
         }
 
