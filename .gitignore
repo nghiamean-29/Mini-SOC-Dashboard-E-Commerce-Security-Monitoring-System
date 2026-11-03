@@ -60,3 +60,7 @@ logs/
 target/site/
 dependency-reduced-pom.xml
 *.hprof
+/src/main/frontend/generated/
+/run-log.txt
+/startup-error.txt
+/test-log.txt
