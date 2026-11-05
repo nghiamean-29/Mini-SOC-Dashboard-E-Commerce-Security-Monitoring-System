@@ -1,11 +1,14 @@
+
 package com.yak.minisoc.repository;
 
 import com.yak.minisoc.entity.security.IncidentStatus;
 import com.yak.minisoc.entity.security.SecurityIncident;
 import com.yak.minisoc.entity.security.Severity;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -14,56 +17,121 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Data access for incidents.
+ * Data access for security incidents.
  *
- * <p>Same shape as {@link SecurityAlertRepository}, with one addition: the correlation
- * query {@link #findOpenWithAlertsBySourceIp(String)} - "is there already an open incident
- * from this source that new alerts should join?" - which is how Phase 8 avoids opening a
- * second investigation for an attack that is still going on.</p>
+ * Supports incident management, alert correlation,
+ * deduplication and SOC dashboard statistics.
  */
-public interface SecurityIncidentRepository extends JpaRepository<SecurityIncident, Long> {
+public interface SecurityIncidentRepository
+    extends JpaRepository<SecurityIncident, Long> {
 
-    Optional<SecurityIncident> findByIncidentCode(String incidentCode);
+    // ==========================================
+    // INCIDENT DETAILS
+    // ==========================================
 
-    boolean existsByIncidentCode(String incidentCode);
+    Optional<SecurityIncident> findByIncidentCode(
+        String incidentCode
+    );
 
-    /** Incident detail page: incident, its alerts and the investigation notebook. */
-    @EntityGraph(attributePaths = {"alerts", "notes"})
-    Optional<SecurityIncident> findWithDetailsByIncidentCode(String incidentCode);
+    boolean existsByIncidentCode(
+        String incidentCode
+    );
 
     /**
-     * Open incidents from one source IP, oldest first.
+     * Loads an incident with its linked alerts
+     * and investigation notes.
+     */
+    @EntityGraph(attributePaths = {"alerts", "notes"})
+    Optional<SecurityIncident> findWithDetailsByIncidentCode(
+        String incidentCode
+    );
+
+    // ==========================================
+    // PHASE 7.2 - INCIDENT DEDUPLICATION
+    // ==========================================
+
+    /**
+     * Finds an incident already linked to a security alert.
      *
-     * <p>{@code status in (OPEN, INVESTIGATING)} is written in the query rather than passed
-     * by the caller: "an incident that is still being worked on" is a property of the
-     * workflow, and letting a caller pass an arbitrary list would one day let it pass
-     * {@code RESOLVED} and reopen a closed investigation.</p>
+     * Used to avoid creating duplicate incidents
+     * from the same alert.
      */
     @Query("""
-            select i from SecurityIncident i
-            where i.sourceIp = :sourceIp
-              and i.status in (com.yak.minisoc.entity.security.IncidentStatus.OPEN,
-                               com.yak.minisoc.entity.security.IncidentStatus.INVESTIGATING)
-            order by i.detectedAt asc
-            """)
-    List<SecurityIncident> findOpenWithAlertsBySourceIp(@Param("sourceIp") String sourceIp);
+        select i from SecurityIncident i
+        join i.alerts a
+        where a.id = :alertId
+        """)
+    Optional<SecurityIncident> findByAlertId(
+        @Param("alertId") Long alertId
+    );
 
-    Page<SecurityIncident> findAllByOrderByDetectedAtDesc(Pageable pageable);
-
-    Page<SecurityIncident> findByStatusOrderByDetectedAtDesc(IncidentStatus status, Pageable pageable);
-
-    List<SecurityIncident> findByAssignedToIdOrderByDetectedAtDesc(Long analystId);
-
-    long countByStatus(IncidentStatus status);
-
-    long countBySeverityAndStatus(Severity severity, IncidentStatus status);
-
-    long countByDetectedAtAfter(Instant since);
+    // ==========================================
+    // INCIDENT CORRELATION
+    // ==========================================
 
     /**
-     * Next number for the human readable incident code ({@code INC-0001}).
-     * See {@code order_code_seq} in migration V4 for the reasoning behind sequences.
+     * Finds active incidents from a source IP,
+     * ordered from oldest to newest.
      */
-    @Query(value = "select nextval('incident_code_seq')", nativeQuery = true)
+    @Query("""
+        select i from SecurityIncident i
+        where i.sourceIp = :sourceIp
+          and i.status in (
+              com.yak.minisoc.entity.security.IncidentStatus.OPEN,
+              com.yak.minisoc.entity.security.IncidentStatus.INVESTIGATING
+          )
+        order by i.detectedAt asc
+        """)
+    List<SecurityIncident> findOpenWithAlertsBySourceIp(
+        @Param("sourceIp") String sourceIp
+    );
+
+    // ==========================================
+    // INCIDENT LISTS
+    // ==========================================
+
+    Page<SecurityIncident> findAllByOrderByDetectedAtDesc(
+        Pageable pageable
+    );
+
+    Page<SecurityIncident> findByStatusOrderByDetectedAtDesc(
+        IncidentStatus status,
+        Pageable pageable
+    );
+
+    List<SecurityIncident> findByAssignedToIdOrderByDetectedAtDesc(
+        Long analystId
+    );
+
+    // ==========================================
+    // SOC DASHBOARD STATISTICS
+    // ==========================================
+
+    long countByStatus(
+        IncidentStatus status
+    );
+
+    long countBySeverityAndStatus(
+        Severity severity,
+        IncidentStatus status
+    );
+
+    long countByDetectedAtAfter(
+        Instant since
+    );
+
+    // ==========================================
+    // INCIDENT CODE GENERATION
+    // ==========================================
+
+    /**
+     * Generates the next incident number.
+     *
+     * Example: INC-000001
+     */
+    @Query(
+        value = "select nextval('incident_code_seq')",
+        nativeQuery = true
+    )
     long nextIncidentNumber();
 }

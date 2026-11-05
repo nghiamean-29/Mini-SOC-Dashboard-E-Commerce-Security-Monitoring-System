@@ -60,6 +60,18 @@ class IncidentManagementServiceTest {
         );
     }
 
+    /**
+     * Mocks the locked alert lookup and indicates
+     * that no incident exists for this alert yet.
+     */
+    private void mockNewAlert(Long alertId, SecurityAlert alert) {
+        when(alertRepository.findByIdForUpdate(alertId))
+            .thenReturn(Optional.of(alert));
+
+        when(incidentRepository.findByAlertId(alertId))
+            .thenReturn(Optional.empty());
+    }
+
     private void mockIncidentSave() {
         when(incidentRepository.nextIncidentNumber())
             .thenReturn(1L);
@@ -68,14 +80,16 @@ class IncidentManagementServiceTest {
             .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+    // ==========================================
+    // PHASE 7.1 - ORIGINAL TESTS
+    // ==========================================
+
     @Test
     void shouldCreateIncidentFromBruteForceAlert() {
 
         SecurityAlert alert = createAlert(AlertType.BRUTE_FORCE);
 
-        when(alertRepository.findById(1L))
-            .thenReturn(Optional.of(alert));
-
+        mockNewAlert(1L, alert);
         mockIncidentSave();
 
         SecurityIncident incident =
@@ -99,8 +113,7 @@ class IncidentManagementServiceTest {
 
         SecurityAlert alert = createAlert(AlertType.BRUTE_FORCE);
 
-        when(alertRepository.findById(2L))
-            .thenReturn(Optional.of(alert));
+        mockNewAlert(2L, alert);
 
         when(incidentRepository.nextIncidentNumber())
             .thenReturn(42L);
@@ -120,9 +133,7 @@ class IncidentManagementServiceTest {
 
         SecurityAlert alert = createAlert(AlertType.BRUTE_FORCE);
 
-        when(alertRepository.findById(3L))
-            .thenReturn(Optional.of(alert));
-
+        mockNewAlert(3L, alert);
         mockIncidentSave();
 
         SecurityIncident incident =
@@ -143,7 +154,7 @@ class IncidentManagementServiceTest {
     @Test
     void shouldRejectMissingAlert() {
 
-        when(alertRepository.findById(999L))
+        when(alertRepository.findByIdForUpdate(999L))
             .thenReturn(Optional.empty());
 
         assertThatThrownBy(
@@ -154,6 +165,9 @@ class IncidentManagementServiceTest {
 
         verify(incidentRepository, never())
             .save(any(SecurityIncident.class));
+
+        verify(incidentRepository, never())
+            .findByAlertId(any());
     }
 
     @Test
@@ -162,8 +176,7 @@ class IncidentManagementServiceTest {
         SecurityAlert alert = createAlert(AlertType.BRUTE_FORCE);
         alert.resolve();
 
-        when(alertRepository.findById(4L))
-            .thenReturn(Optional.of(alert));
+        mockNewAlert(4L, alert);
 
         assertThatThrownBy(
             () -> service.createIncidentFromAlert(4L)
@@ -180,9 +193,7 @@ class IncidentManagementServiceTest {
 
         SecurityAlert alert = createAlert(AlertType.REQUEST_FLOOD);
 
-        when(alertRepository.findById(5L))
-            .thenReturn(Optional.of(alert));
-
+        mockNewAlert(5L, alert);
         mockIncidentSave();
 
         SecurityIncident incident =
@@ -198,9 +209,7 @@ class IncidentManagementServiceTest {
         SecurityAlert alert =
             createAlert(AlertType.UNAUTHORIZED_ACCESS);
 
-        when(alertRepository.findById(6L))
-            .thenReturn(Optional.of(alert));
-
+        mockNewAlert(6L, alert);
         mockIncidentSave();
 
         SecurityIncident incident =
@@ -223,5 +232,114 @@ class IncidentManagementServiceTest {
             incidentRepository,
             userRepository
         );
+    }
+
+    // ==========================================
+    // PHASE 7.2 - INCIDENT DEDUPLICATION TESTS
+    // ==========================================
+
+    @Test
+    void shouldReturnExistingIncidentForSameAlert() {
+
+        SecurityAlert alert = createAlert(AlertType.BRUTE_FORCE);
+
+        SecurityIncident existing = SecurityIncident.open(
+            IncidentType.POSSIBLE_BRUTE_FORCE_ATTACK,
+            alert.getSeverity(),
+            alert.getSourceIp(),
+            "Existing brute force incident",
+            detectedAt
+        );
+
+        existing.assignIncidentCode("INC-000010");
+        existing.linkAlert(alert);
+
+        when(alertRepository.findByIdForUpdate(10L))
+            .thenReturn(Optional.of(alert));
+
+        when(incidentRepository.findByAlertId(10L))
+            .thenReturn(Optional.of(existing));
+
+        SecurityIncident result =
+            service.createIncidentFromAlert(10L);
+
+        assertThat(result).isSameAs(existing);
+        assertThat(result.getIncidentCode())
+            .isEqualTo("INC-000010");
+
+        verify(incidentRepository, never())
+            .nextIncidentNumber();
+
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldReturnExistingIncidentForResolvedAlert() {
+
+        SecurityAlert alert = createAlert(AlertType.BRUTE_FORCE);
+        alert.resolve();
+
+        SecurityIncident existing = SecurityIncident.open(
+            IncidentType.POSSIBLE_BRUTE_FORCE_ATTACK,
+            alert.getSeverity(),
+            alert.getSourceIp(),
+            "Existing incident",
+            detectedAt
+        );
+
+        existing.assignIncidentCode("INC-000011");
+        existing.linkAlert(alert);
+
+        when(alertRepository.findByIdForUpdate(11L))
+            .thenReturn(Optional.of(alert));
+
+        when(incidentRepository.findByAlertId(11L))
+            .thenReturn(Optional.of(existing));
+
+        SecurityIncident result =
+            service.createIncidentFromAlert(11L);
+
+        assertThat(result).isSameAs(existing);
+
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldCheckExistingIncidentBeforeGeneratingCode() {
+
+        SecurityAlert alert = createAlert(AlertType.REQUEST_FLOOD);
+
+        SecurityIncident existing = SecurityIncident.open(
+            IncidentType.POSSIBLE_REQUEST_FLOOD,
+            alert.getSeverity(),
+            alert.getSourceIp(),
+            "Existing flood incident",
+            detectedAt
+        );
+
+        existing.assignIncidentCode("INC-000012");
+        existing.linkAlert(alert);
+
+        when(alertRepository.findByIdForUpdate(12L))
+            .thenReturn(Optional.of(alert));
+
+        when(incidentRepository.findByAlertId(12L))
+            .thenReturn(Optional.of(existing));
+
+        SecurityIncident result =
+            service.createIncidentFromAlert(12L);
+
+        assertThat(result.getIncidentCode())
+            .isEqualTo("INC-000012");
+
+        verify(incidentRepository).findByAlertId(12L);
+
+        verify(incidentRepository, never())
+            .nextIncidentNumber();
+
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
     }
 }

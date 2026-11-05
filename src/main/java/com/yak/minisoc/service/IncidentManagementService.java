@@ -33,36 +33,43 @@ public class IncidentManagementService {
     }
 
     // ==========================================
-    // PHASE 7.1 - CREATE INCIDENT FROM ALERT
+    // PHASE 7.2 - CREATE INCIDENT WITH DEDUPLICATION
     // ==========================================
 
     public SecurityIncident createIncidentFromAlert(Long alertId) {
 
         Objects.requireNonNull(alertId, "alertId");
 
-        // 1. Find the security alert
-        SecurityAlert alert = alertRepository.findById(alertId)
+        // 1. Lock the alert to prevent concurrent creation
+        SecurityAlert alert = alertRepository.findByIdForUpdate(alertId)
             .orElseThrow(() -> new IllegalArgumentException(
                 "Security alert not found: " + alertId));
 
-        // 2. Only active alerts can create incidents
+        // 2. Check whether an incident already exists
+        var existingIncident = incidentRepository.findByAlertId(alertId);
+
+        if (existingIncident.isPresent()) {
+            return existingIncident.get();
+        }
+
+        // 3. Only active alerts can create new incidents
         if (!alert.isActive()) {
             throw new IllegalStateException(
                 "Cannot create incident from inactive alert: " + alertId);
         }
 
-        // 3. Map AlertType to IncidentType
+        // 4. Map AlertType to IncidentType
         IncidentType incidentType =
             mapIncidentType(alert.getAlertType());
 
-        // 4. Generate incident title
+        // 5. Generate incident title
         String title = incidentType.label()
             + (alert.getSourceIp() == null
             || alert.getSourceIp().isBlank()
             ? ""
             : " from " + alert.getSourceIp());
 
-        // 5. Create incident
+        // 6. Create incident
         SecurityIncident incident = SecurityIncident.open(
             incidentType,
             alert.getSeverity(),
@@ -71,17 +78,17 @@ public class IncidentManagementService {
             alert.getDetectedAt()
         );
 
-        // 6. Generate unique incident code
+        // 7. Generate unique incident code
         long number = incidentRepository.nextIncidentNumber();
 
         incident.assignIncidentCode(
             "INC-%06d".formatted(number)
         );
 
-        // 7. Link the originating alert
+        // 8. Link the originating alert
         incident.linkAlert(alert);
 
-        // 8. Save incident to PostgreSQL
+        // 9. Save incident to PostgreSQL
         return incidentRepository.save(incident);
     }
 

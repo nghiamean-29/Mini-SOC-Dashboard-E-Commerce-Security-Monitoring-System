@@ -6,6 +6,8 @@ import com.yak.minisoc.entity.security.AlertType;
 import com.yak.minisoc.entity.security.SecurityAlert;
 import com.yak.minisoc.entity.security.Severity;
 
+import jakarta.persistence.LockModeType;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -34,7 +37,28 @@ public interface SecurityAlertRepository
     Optional<SecurityAlert> findWithEventsById(Long id);
 
     // ==========================================
-    // DEDUPLICATION
+    // PHASE 7.2 - INCIDENT DEDUPLICATION
+    // ==========================================
+
+    /**
+     * Locks an alert while creating an incident.
+     *
+     * Prevents concurrent transactions from
+     * processing the same alert simultaneously.
+     *
+     * Must be called inside a transaction.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select a from SecurityAlert a
+        where a.id = :alertId
+        """)
+    Optional<SecurityAlert> findByIdForUpdate(
+        @Param("alertId") Long alertId
+    );
+
+    // ==========================================
+    // ALERT DEDUPLICATION
     // ==========================================
 
     Optional<SecurityAlert> findByDedupKey(String dedupKey);
@@ -78,10 +102,10 @@ public interface SecurityAlertRepository
     );
 
     @Query("""
-            select a from SecurityAlert a
-            where a.status in :statuses
-            order by a.severity desc, a.detectedAt desc
-            """)
+        select a from SecurityAlert a
+        where a.status in :statuses
+        order by a.severity desc, a.detectedAt desc
+        """)
     Page<SecurityAlert> findActiveOrdered(
         @Param("statuses") List<AlertStatus> statuses,
         Pageable pageable
@@ -130,17 +154,17 @@ public interface SecurityAlertRepository
      * detection rule since the given timestamp.
      */
     @Query("""
-            select a.ruleName as ruleName,
-                   count(a) as total,
-                   sum(case
-                       when a.status = com.yak.minisoc.entity.security.AlertStatus.FALSE_POSITIVE
-                       then 1 else 0
-                   end) as falsePositives
-            from SecurityAlert a
-            where a.detectedAt >= :since
-            group by a.ruleName
-            order by count(a) desc
-            """)
+        select a.ruleName as ruleName,
+               count(a) as total,
+               sum(case
+                   when a.status = com.yak.minisoc.entity.security.AlertStatus.FALSE_POSITIVE
+                   then 1 else 0
+               end) as falsePositives
+        from SecurityAlert a
+        where a.detectedAt >= :since
+        group by a.ruleName
+        order by count(a) desc
+        """)
     List<RuleQuality> ruleQualitySince(
         @Param("since") Instant since
     );
