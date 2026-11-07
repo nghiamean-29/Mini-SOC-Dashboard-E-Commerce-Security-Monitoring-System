@@ -5,6 +5,8 @@ import com.yak.minisoc.entity.security.IncidentStatus;
 import com.yak.minisoc.entity.security.SecurityIncident;
 import com.yak.minisoc.entity.security.Severity;
 
+import com.yak.minisoc.entity.security.IncidentType;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -69,21 +72,37 @@ public interface SecurityIncidentRepository
     // INCIDENT CORRELATION
     // ==========================================
 
-    /**
-     * Finds active incidents from a source IP,
-     * ordered from oldest to newest.
-     */
+    // Serialize candidate lookup and creation even when no incident row exists.
+    @Query(value = """
+        select 1 from pg_advisory_xact_lock(
+            hashtextextended(concat('minisoc:incident:', :sourceIp, ':', :family), 0)
+        )
+        """, nativeQuery = true)
+    int lockCorrelationKey(@Param("sourceIp") String sourceIp, @Param("family") String family);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         select i from SecurityIncident i
         where i.sourceIp = :sourceIp
+          and i.incidentType = :incidentType
           and i.status in (
               com.yak.minisoc.entity.security.IncidentStatus.OPEN,
               com.yak.minisoc.entity.security.IncidentStatus.INVESTIGATING
           )
-        order by i.detectedAt asc
+          and i.detectedAt between :earliest and :latest
+          and not exists (
+              select a.id from SecurityIncident candidate join candidate.alerts a
+              where candidate.id = i.id
+                and (a.detectedAt < :earliest or a.detectedAt > :latest)
+          )
+        order by i.detectedAt desc, i.id desc
         """)
-    List<SecurityIncident> findOpenWithAlertsBySourceIp(
-        @Param("sourceIp") String sourceIp
+    List<SecurityIncident> findCorrelationCandidates(
+        @Param("sourceIp") String sourceIp,
+        @Param("incidentType") IncidentType incidentType,
+        @Param("earliest") Instant earliest,
+        @Param("latest") Instant latest,
+        Pageable pageable
     );
 
     // ==========================================

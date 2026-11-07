@@ -3,9 +3,6 @@ package com.yak.minisoc.service;
 import com.yak.minisoc.entity.User;
 import com.yak.minisoc.entity.UserStatus;
 import com.yak.minisoc.entity.security.IncidentNote;
-import java.time.Instant;
-import com.yak.minisoc.entity.User;
-import com.yak.minisoc.entity.UserStatus;
 import com.yak.minisoc.entity.security.AlertType;
 import com.yak.minisoc.entity.security.IncidentType;
 import com.yak.minisoc.entity.security.SecurityAlert;
@@ -14,7 +11,11 @@ import com.yak.minisoc.repository.SecurityAlertRepository;
 import com.yak.minisoc.repository.SecurityIncidentRepository;
 import com.yak.minisoc.repository.UserRepository;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
+
+import org.springframework.data.domain.PageRequest;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class IncidentManagementService {
+
+    private static final Duration CORRELATION_WINDOW = Duration.ofMinutes(30);
 
     private final SecurityIncidentRepository incidentRepository;
     private final SecurityAlertRepository alertRepository;
@@ -38,7 +41,7 @@ public class IncidentManagementService {
     }
 
     // ==========================================
-    // PHASE 7.2 - CREATE INCIDENT WITH DEDUPLICATION
+    // CREATE OR CORRELATE INCIDENT WITH DEDUPLICATION
     // ==========================================
 
     public SecurityIncident createIncidentFromAlert(Long alertId) {
@@ -67,12 +70,25 @@ public class IncidentManagementService {
         IncidentType incidentType =
             mapIncidentType(alert.getAlertType());
 
-        // 5. Generate incident title
-        String title = incidentType.label()
-            + (alert.getSourceIp() == null
-            || alert.getSourceIp().isBlank()
-            ? ""
-            : " from " + alert.getSourceIp());
+        String sourceIp = alert.getSourceIp();
+        String title = incidentType.label();
+        if (sourceIp != null && !sourceIp.isBlank()) {
+            incidentRepository.lockCorrelationKey(sourceIp, incidentType.name());
+
+            Instant detectedAt = alert.getDetectedAt();
+            var candidates = incidentRepository.findCorrelationCandidates(
+                sourceIp, incidentType,
+                detectedAt.minus(CORRELATION_WINDOW),
+                detectedAt.plus(CORRELATION_WINDOW),
+                PageRequest.of(0, 1)
+            );
+            if (!candidates.isEmpty()) {
+                SecurityIncident incident = candidates.getFirst();
+                incident.linkAlert(alert);
+                return incident;
+            }
+            title += " from " + sourceIp;
+        }
 
         // 6. Create incident
         SecurityIncident incident = SecurityIncident.open(

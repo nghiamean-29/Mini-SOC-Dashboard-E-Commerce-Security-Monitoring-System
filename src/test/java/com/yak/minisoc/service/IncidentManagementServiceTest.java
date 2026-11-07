@@ -18,7 +18,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.yak.minisoc.entity.security.Severity;
+import org.springframework.data.domain.PageRequest;
+
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,6 +99,32 @@ class IncidentManagementServiceTest {
     // ==========================================
     // PHASE 7.1 - ORIGINAL TESTS
     // ==========================================
+
+    @Test
+    void shouldLinkAndEscalateMatchingIncidentWithoutAllocatingCode() {
+        SecurityAlert alert = createAlert(AlertType.BRUTE_FORCE);
+        alert.escalateTo(Severity.CRITICAL);
+        SecurityIncident incident = createOpenIncident();
+        incident.linkAlert(createAlert(AlertType.BRUTE_FORCE));
+        mockNewAlert(20L, alert);
+        var type = IncidentType.POSSIBLE_BRUTE_FORCE_ATTACK;
+        var firstPage = PageRequest.of(0, 1);
+        when(incidentRepository.findCorrelationCandidates(
+            alert.getSourceIp(), type, detectedAt.minusSeconds(1800),
+            detectedAt.plusSeconds(1800), firstPage
+        )).thenReturn(List.of(incident));
+
+        assertThat(service.createIncidentFromAlert(20L)).isSameAs(incident);
+        assertThat(incident.getSeverity()).isEqualTo(Severity.CRITICAL);
+        assertThat(incident.getAlertCount()).isEqualTo(2);
+        var order = inOrder(incidentRepository);
+        order.verify(incidentRepository).lockCorrelationKey(alert.getSourceIp(), type.name());
+        order.verify(incidentRepository).findCorrelationCandidates(
+            alert.getSourceIp(), type, detectedAt.minusSeconds(1800),
+            detectedAt.plusSeconds(1800), firstPage
+        );
+        verify(incidentRepository, never()).nextIncidentNumber();
+    }
 
     @Test
     void shouldCreateIncidentFromBruteForceAlert() {
