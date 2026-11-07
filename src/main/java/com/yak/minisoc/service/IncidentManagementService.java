@@ -1,6 +1,9 @@
 
 package com.yak.minisoc.service;
-
+import com.yak.minisoc.entity.User;
+import com.yak.minisoc.entity.UserStatus;
+import com.yak.minisoc.entity.security.IncidentNote;
+import java.time.Instant;
 import com.yak.minisoc.entity.User;
 import com.yak.minisoc.entity.UserStatus;
 import com.yak.minisoc.entity.security.AlertType;
@@ -174,12 +177,125 @@ public class IncidentManagementService {
         };
     }
 
+
     // ==========================================
-    // NEXT PHASE 7 FEATURES
+    // PHASE 7.4 - INVESTIGATION WORKFLOW
     // ==========================================
 
-    // startInvestigation()
-    // addInvestigationNote()
-    // resolveIncident()
-    // markFalsePositive()
+    public SecurityIncident startInvestigation(Long incidentId) {
+        Objects.requireNonNull(incidentId, "incidentId");
+
+        SecurityIncident incident = incidentRepository.findById(incidentId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Security incident not found: " + incidentId));
+
+        if (!incident.isActive()) {
+            throw new IllegalStateException(
+                "Cannot investigate inactive incident: " + incidentId);
+        }
+
+        if (incident.getAssignedTo() == null) {
+            throw new IllegalStateException(
+                "Incident must be assigned before investigation");
+        }
+
+        incident.startInvestigation();
+
+        return incidentRepository.save(incident);
+    }
+
+    public IncidentNote addInvestigationNote(
+        Long incidentId,
+        Long authorId,
+        String content) {
+
+        Objects.requireNonNull(incidentId, "incidentId");
+        Objects.requireNonNull(authorId, "authorId");
+
+        SecurityIncident incident = incidentRepository.findById(incidentId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Security incident not found: " + incidentId));
+
+        if (!incident.isActive()) {
+            throw new IllegalStateException(
+                "Cannot add note to inactive incident: " + incidentId);
+        }
+
+        if (incident.getAssignedTo() == null) {
+            throw new IllegalStateException(
+                "Incident has no assigned SOC analyst");
+        }
+
+        User author = userRepository.findById(authorId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "SOC analyst not found: " + authorId));
+
+        if (author.getStatus() != UserStatus.ACTIVE) {
+            throw new IllegalStateException(
+                "Cannot add note using inactive analyst");
+        }
+
+        if (!author.hasRole("SOC_ANALYST")) {
+            throw new IllegalArgumentException(
+                "User must have SOC_ANALYST role");
+        }
+
+        if (incident.getAssignedTo().getId() == null
+            || !incident.getAssignedTo().getId().equals(authorId)) {
+            throw new IllegalStateException(
+                "Only the assigned analyst can add notes");
+        }
+
+        IncidentNote note = incident.addNote(
+            author,
+            author.getUsername(),
+            content
+        );
+
+        // IncidentNote is persisted through CascadeType.ALL.
+        incidentRepository.save(incident);
+
+        return note;
+    }
+
+    public SecurityIncident resolveIncident(
+        Long incidentId,
+        String resolution) {
+
+        Objects.requireNonNull(incidentId, "incidentId");
+
+        SecurityIncident incident = incidentRepository.findById(incidentId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Security incident not found: " + incidentId));
+
+        if (!incident.isActive()) {
+            throw new IllegalStateException(
+                "Cannot resolve inactive incident: " + incidentId);
+        }
+
+        incident.resolve(resolution, Instant.now());
+
+        return incidentRepository.save(incident);
+    }
+
+    public SecurityIncident markFalsePositive(
+        Long incidentId,
+        String reason) {
+
+        Objects.requireNonNull(incidentId, "incidentId");
+
+        SecurityIncident incident = incidentRepository.findById(incidentId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Security incident not found: " + incidentId));
+
+        if (!incident.isActive()) {
+            throw new IllegalStateException(
+                "Cannot close inactive incident: " + incidentId);
+        }
+
+        incident.markFalsePositive(reason, Instant.now());
+
+        return incidentRepository.save(incident);
+    }
+
 }

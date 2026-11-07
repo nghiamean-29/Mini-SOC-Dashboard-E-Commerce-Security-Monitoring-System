@@ -510,4 +510,222 @@ class IncidentManagementServiceTest {
             .hasMessageContaining("SOC_ANALYST role");
         verify(incidentRepository, never()).save(any(SecurityIncident.class));
     }
+
+    // ==========================================
+    // PHASE 7.4 - INVESTIGATION WORKFLOW TESTS
+    // ==========================================
+
+    @Test
+    void shouldStartInvestigation() {
+        SecurityIncident incident = createOpenIncident();
+        User analyst = User.create(
+            "analyst", "analyst@example.com", "hash", "SOC Analyst");
+        analyst.addRole(Role.create(
+            "SOC_ANALYST", "SOC Analyst", "Security analyst"));
+        incident.assignTo(analyst);
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+        when(incidentRepository.save(incident))
+            .thenReturn(incident);
+
+        SecurityIncident result = service.startInvestigation(1L);
+
+        assertThat(result.getStatus())
+            .isEqualTo(IncidentStatus.INVESTIGATING);
+        verify(incidentRepository).save(incident);
+    }
+
+    @Test
+    void shouldRejectInvestigationWithoutAssignment() {
+        SecurityIncident incident = createOpenIncident();
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(() -> service.startInvestigation(1L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("must be assigned");
+
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldRejectInvestigationOfResolvedIncident() {
+        SecurityIncident incident = createOpenIncident();
+        incident.resolve("Resolved", detectedAt.plusSeconds(3600));
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(() -> service.startInvestigation(1L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("inactive incident");
+    }
+
+    @Test
+    void shouldRejectMissingIncidentForInvestigation() {
+        when(incidentRepository.findById(999L))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.startInvestigation(999L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Security incident not found");
+    }
+
+    @Test
+    void shouldResolveIncident() {
+        SecurityIncident incident = createOpenIncident();
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+        when(incidentRepository.save(incident))
+            .thenReturn(incident);
+
+        SecurityIncident result =
+            service.resolveIncident(1L, "Blocked malicious IP");
+
+        assertThat(result.getStatus())
+            .isEqualTo(IncidentStatus.RESOLVED);
+        assertThat(result.getResolution())
+            .isEqualTo("Blocked malicious IP");
+        assertThat(result.getResolvedAt()).isNotNull();
+    }
+
+    @Test
+    void shouldRejectResolvingAlreadyResolvedIncident() {
+        SecurityIncident incident = createOpenIncident();
+        incident.resolve("Already resolved", detectedAt.plusSeconds(3600));
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(
+            () -> service.resolveIncident(1L, "Resolve again"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("inactive incident");
+    }
+
+    @Test
+    void shouldMarkIncidentAsFalsePositive() {
+        SecurityIncident incident = createOpenIncident();
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+        when(incidentRepository.save(incident))
+            .thenReturn(incident);
+
+        SecurityIncident result =
+            service.markFalsePositive(1L, "Legitimate user activity");
+
+        assertThat(result.getStatus())
+            .isEqualTo(IncidentStatus.FALSE_POSITIVE);
+        assertThat(result.getResolution())
+            .isEqualTo("Legitimate user activity");
+        assertThat(result.getResolvedAt()).isNotNull();
+    }
+
+    @Test
+    void shouldRejectFalsePositiveForClosedIncident() {
+        SecurityIncident incident = createOpenIncident();
+        incident.resolve("Already closed", detectedAt.plusSeconds(3600));
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(
+            () -> service.markFalsePositive(1L, "False alarm"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("inactive incident");
+    }
+
+    @Test
+    void shouldRejectBlankInvestigationNote() {
+        SecurityIncident incident = createOpenIncident();
+
+        User analyst = org.mockito.Mockito.mock(User.class);
+        when(analyst.getId()).thenReturn(10L);
+        when(analyst.getStatus())
+            .thenReturn(com.yak.minisoc.entity.UserStatus.ACTIVE);
+        when(analyst.hasRole("SOC_ANALYST")).thenReturn(true);
+
+        incident.assignTo(analyst);
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+        when(userRepository.findById(10L))
+            .thenReturn(Optional.of(analyst));
+
+        assertThatThrownBy(
+            () -> service.addInvestigationNote(1L, 10L, "  "))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("note content must not be blank");
+
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldAddInvestigationNoteSuccessfully() {
+        SecurityIncident incident = createOpenIncident();
+
+        User analyst = org.mockito.Mockito.mock(User.class);
+        when(analyst.getId()).thenReturn(10L);
+        when(analyst.getStatus())
+            .thenReturn(com.yak.minisoc.entity.UserStatus.ACTIVE);
+        when(analyst.hasRole("SOC_ANALYST")).thenReturn(true);
+        when(analyst.getUsername()).thenReturn("soc_analyst");
+
+        incident.assignTo(analyst);
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+        when(userRepository.findById(10L))
+            .thenReturn(Optional.of(analyst));
+
+        var note = service.addInvestigationNote(
+            1L, 10L, "Suspicious login attempts detected"
+        );
+
+        assertThat(note.getContent())
+            .isEqualTo("Suspicious login attempts detected");
+        assertThat(note.getAuthor()).isSameAs(analyst);
+        assertThat(note.getAuthorUsername()).isEqualTo("soc_analyst");
+        assertThat(incident.getNotes()).contains(note);
+
+        verify(incidentRepository).save(incident);
+    }
+
+    @Test
+    void shouldRejectNoteFromUnassignedAnalyst() {
+        SecurityIncident incident = createOpenIncident();
+
+        User assignedAnalyst = org.mockito.Mockito.mock(User.class);
+        when(assignedAnalyst.getId()).thenReturn(10L);
+        incident.assignTo(assignedAnalyst);
+
+        User otherAnalyst = org.mockito.Mockito.mock(User.class);
+        when(otherAnalyst.getStatus())
+            .thenReturn(com.yak.minisoc.entity.UserStatus.ACTIVE);
+        when(otherAnalyst.hasRole("SOC_ANALYST")).thenReturn(true);
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+        when(userRepository.findById(20L))
+            .thenReturn(Optional.of(otherAnalyst));
+
+        assertThatThrownBy(() ->
+            service.addInvestigationNote(
+                1L, 20L, "Unauthorized investigation note"
+            )
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Only the assigned analyst");
+
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+
 }
