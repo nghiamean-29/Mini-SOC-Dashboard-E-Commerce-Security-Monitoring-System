@@ -1,6 +1,8 @@
 
 package com.yak.minisoc.service;
 
+import com.yak.minisoc.entity.User;
+import com.yak.minisoc.entity.UserStatus;
 import com.yak.minisoc.entity.security.AlertType;
 import com.yak.minisoc.entity.security.IncidentType;
 import com.yak.minisoc.entity.security.SecurityAlert;
@@ -93,6 +95,60 @@ public class IncidentManagementService {
     }
 
     // ==========================================
+    // PHASE 7.3 - ASSIGN INCIDENT TO SOC ANALYST
+    // ==========================================
+
+    public SecurityIncident assignIncident(
+        Long incidentId,
+        Long analystId) {
+
+        Objects.requireNonNull(incidentId, "incidentId");
+        Objects.requireNonNull(analystId, "analystId");
+
+        // 1. Find the incident
+        SecurityIncident incident = incidentRepository
+            .findById(incidentId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Security incident not found: " + incidentId
+            ));
+
+        // 2. Only active incidents can be assigned
+        if (!incident.isActive()) {
+            throw new IllegalStateException(
+                "Cannot assign inactive incident: " + incidentId
+            );
+        }
+
+        // 3. Find the analyst
+        User analyst = userRepository.findById(analystId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "SOC analyst not found: " + analystId
+            ));
+
+        // 4. Check account status
+        if (analyst.getStatus() != UserStatus.ACTIVE) {
+            throw new IllegalStateException(
+                "Cannot assign incident to inactive analyst: "
+                    + analystId
+            );
+        }
+
+        // 5. Check SOC_ANALYST role
+        if (!analyst.hasRole("SOC_ANALYST")) {
+            throw new IllegalArgumentException(
+                "User does not have SOC_ANALYST role: "
+                    + analystId
+            );
+        }
+
+        // 6. Assign incident
+        incident.assignTo(analyst);
+
+        // 7. Persist changes
+        return incidentRepository.save(incident);
+    }
+
+    // ==========================================
     // MAP ALERT TYPE TO INCIDENT TYPE
     // ==========================================
 
@@ -122,7 +178,6 @@ public class IncidentManagementService {
     // NEXT PHASE 7 FEATURES
     // ==========================================
 
-    // assignIncident()
     // startInvestigation()
     // addInvestigationNote()
     // resolveIncident()

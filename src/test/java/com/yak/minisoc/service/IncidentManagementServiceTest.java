@@ -1,6 +1,7 @@
-
 package com.yak.minisoc.service;
 
+import com.yak.minisoc.entity.Role;
+import com.yak.minisoc.entity.User;
 import com.yak.minisoc.entity.security.AlertType;
 import com.yak.minisoc.entity.security.IncidentStatus;
 import com.yak.minisoc.entity.security.IncidentType;
@@ -78,6 +79,17 @@ class IncidentManagementServiceTest {
 
         when(incidentRepository.save(any(SecurityIncident.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+
+    private SecurityIncident createOpenIncident() {
+        return SecurityIncident.open(
+            IncidentType.POSSIBLE_BRUTE_FORCE_ATTACK,
+            createAlert(AlertType.BRUTE_FORCE).getSeverity(),
+            "192.168.1.100",
+            "Brute force incident",
+            detectedAt
+        );
     }
 
     // ==========================================
@@ -341,5 +353,161 @@ class IncidentManagementServiceTest {
 
         verify(incidentRepository, never())
             .save(any(SecurityIncident.class));
+    }
+
+
+    // ==========================================
+    // PHASE 7.3 - ASSIGN INCIDENT TESTS
+    // ==========================================
+
+    @Test
+    void shouldRejectAssigningMissingIncident() {
+        when(incidentRepository.findById(999L))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.assignIncident(999L, 10L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Security incident not found");
+
+        verifyNoInteractions(userRepository);
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldRejectAssigningMissingAnalyst() {
+        SecurityIncident incident = createOpenIncident();
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+        when(userRepository.findById(999L))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.assignIncident(1L, 999L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("SOC analyst not found");
+
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldRejectNullIncidentId() {
+        assertThatThrownBy(() -> service.assignIncident(null, 10L))
+            .isInstanceOf(NullPointerException.class);
+
+        verifyNoInteractions(incidentRepository, alertRepository, userRepository);
+    }
+
+    @Test
+    void shouldRejectNullAnalystId() {
+        assertThatThrownBy(() -> service.assignIncident(1L, null))
+            .isInstanceOf(NullPointerException.class);
+
+        verifyNoInteractions(incidentRepository, alertRepository, userRepository);
+    }
+
+    @Test
+    void shouldRejectAssigningResolvedIncident() {
+        SecurityIncident incident = createOpenIncident();
+        incident.resolve("Investigation completed", detectedAt.plusSeconds(3600));
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(() -> service.assignIncident(1L, 10L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Cannot assign inactive incident");
+
+        verifyNoInteractions(userRepository);
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldRejectAssigningFalsePositiveIncident() {
+        SecurityIncident incident = createOpenIncident();
+        incident.markFalsePositive("Confirmed false positive", detectedAt.plusSeconds(3600));
+
+        when(incidentRepository.findById(1L))
+            .thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(() -> service.assignIncident(1L, 10L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Cannot assign inactive incident");
+
+        verifyNoInteractions(userRepository);
+        verify(incidentRepository, never())
+            .save(any(SecurityIncident.class));
+    }
+
+
+    // ==========================================
+    // PHASE 7.3 - ANALYST ROLE & STATUS TESTS
+    // ==========================================
+
+    @Test
+    void shouldAssignIncidentToActiveSocAnalyst() {
+        SecurityIncident incident = createOpenIncident();
+        User analyst = User.create("soc_analyst", "analyst@example.com", "test-hash", "SOC Analyst");
+        analyst.addRole(Role.create("SOC_ANALYST", "SOC Analyst", "Security analyst"));
+
+        when(incidentRepository.findById(1L)).thenReturn(Optional.of(incident));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(analyst));
+        when(incidentRepository.save(incident)).thenReturn(incident);
+
+        SecurityIncident result = service.assignIncident(1L, 10L);
+
+        assertThat(result).isSameAs(incident);
+        assertThat(result.getAssignedTo()).isSameAs(analyst);
+        assertThat(result.getStatus()).isEqualTo(IncidentStatus.OPEN);
+        verify(incidentRepository).save(incident);
+    }
+
+    @Test
+    void shouldRejectLockedSocAnalyst() {
+        SecurityIncident incident = createOpenIncident();
+        User analyst = User.create("locked_analyst", "locked@example.com", "test-hash", "Locked Analyst");
+        analyst.addRole(Role.create("SOC_ANALYST", "SOC Analyst", "Security analyst"));
+        analyst.lock();
+
+        when(incidentRepository.findById(1L)).thenReturn(Optional.of(incident));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(analyst));
+
+        assertThatThrownBy(() -> service.assignIncident(1L, 10L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("inactive analyst");
+        verify(incidentRepository, never()).save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldRejectDisabledSocAnalyst() {
+        SecurityIncident incident = createOpenIncident();
+        User analyst = User.create("disabled_analyst", "disabled@example.com", "test-hash", "Disabled Analyst");
+        analyst.addRole(Role.create("SOC_ANALYST", "SOC Analyst", "Security analyst"));
+        analyst.disable();
+
+        when(incidentRepository.findById(1L)).thenReturn(Optional.of(incident));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(analyst));
+
+        assertThatThrownBy(() -> service.assignIncident(1L, 10L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("inactive analyst");
+        verify(incidentRepository, never()).save(any(SecurityIncident.class));
+    }
+
+    @Test
+    void shouldRejectUserWithoutSocAnalystRole() {
+        SecurityIncident incident = createOpenIncident();
+        User customer = User.create("customer", "customer@example.com", "test-hash", "Customer");
+        customer.addRole(Role.create("CUSTOMER", "Customer", "E-commerce customer"));
+
+        when(incidentRepository.findById(1L)).thenReturn(Optional.of(incident));
+        when(userRepository.findById(20L)).thenReturn(Optional.of(customer));
+
+        assertThatThrownBy(() -> service.assignIncident(1L, 20L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("SOC_ANALYST role");
+        verify(incidentRepository, never()).save(any(SecurityIncident.class));
     }
 }
