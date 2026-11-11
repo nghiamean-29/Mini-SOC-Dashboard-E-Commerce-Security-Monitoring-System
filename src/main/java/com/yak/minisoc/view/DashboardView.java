@@ -11,6 +11,9 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
+import com.yak.minisoc.entity.security.IncidentStatus;
+import com.yak.minisoc.entity.security.Severity;
+import com.yak.minisoc.repository.SecurityIncidentRepository;
 import com.yak.minisoc.service.DashboardService;
 import com.yak.minisoc.service.SecurityEventSimulatorService;
 
@@ -26,16 +29,18 @@ public class DashboardView extends VerticalLayout {
 
     private final DashboardService dashboardService;
     private final SecurityEventSimulatorService simulatorService;
+    private final SecurityIncidentRepository incidentRepository;
 
-    private final HorizontalLayout statistics =
-        new HorizontalLayout();
+    private final HorizontalLayout statistics = new HorizontalLayout();
 
     public DashboardView(
         DashboardService dashboardService,
-        SecurityEventSimulatorService simulatorService) {
+        SecurityEventSimulatorService simulatorService,
+        SecurityIncidentRepository incidentRepository) {
 
         this.dashboardService = dashboardService;
         this.simulatorService = simulatorService;
+        this.incidentRepository = incidentRepository;
 
         setSizeFull();
         setPadding(true);
@@ -49,9 +54,26 @@ public class DashboardView extends VerticalLayout {
         );
 
         statistics.setWidthFull();
-        statistics.setSpacing(true);
+        statistics.setSpacing(false);
+
+        statistics.getStyle()
+            .set("display", "flex")
+            .set("flex-wrap", "wrap")
+            .set("gap", "16px");
 
         refreshStatistics();
+
+        Button refreshButton = new Button(
+            "Refresh Dashboard",
+            event -> refreshStatistics()
+        );
+
+        Button eventsButton = new Button(
+            "View Security Events",
+            event -> getUI().ifPresent(
+                ui -> ui.navigate("soc/events")
+            )
+        );
 
         Button generateButton = new Button(
             "Generate Demo Events",
@@ -63,16 +85,27 @@ public class DashboardView extends VerticalLayout {
             .set("color", "#ffffff")
             .set("border-radius", "8px");
 
-        // Only ADMIN can generate demo events
         generateButton.setVisible(isAdmin());
 
-        Button eventsButton = new Button(
-            "View Security Events",
+        HorizontalLayout actions = new HorizontalLayout(
+            refreshButton,
+            eventsButton,
+            generateButton
+        );
+
+        actions.setWidthFull();
+
+        actions.getStyle()
+            .set("flex-wrap", "wrap")
+            .set("gap", "12px");
+        Button incidentsButton = new Button(
+            "View Security Incidents",
             event -> getUI().ifPresent(
-                ui -> ui.navigate("soc/events")
+                ui -> ui.navigate("soc/incidents")
             )
         );
 
+        actions.add(incidentsButton);
         add(
             title,
             subtitle,
@@ -81,8 +114,7 @@ public class DashboardView extends VerticalLayout {
             new Paragraph(
                 "Dữ liệu thống kê được lấy từ PostgreSQL."
             ),
-            eventsButton,
-            generateButton
+            actions
         );
     }
 
@@ -104,43 +136,73 @@ public class DashboardView extends VerticalLayout {
 
     private void refreshStatistics() {
 
-        DashboardService.DashboardStats stats =
-            dashboardService.getStats();
+        try {
+            DashboardService.DashboardStats stats =
+                dashboardService.getStats();
 
-        statistics.removeAll();
+            long openIncidents =
+                incidentRepository.countByStatus(
+                    IncidentStatus.OPEN
+                );
 
-        statistics.add(
-            createCard(
-                "Security Events",
-                stats.securityEvents()
-            ),
-            createCard(
-                "Security Incidents",
-                stats.securityIncidents()
-            ),
-            createCard(
-                "Active Alerts",
-                stats.activeAlerts()
-            ),
-            createCard(
-                "Total Users",
-                stats.users()
-            )
-        );
+            long criticalIncidents =
+                incidentRepository.countBySeverityAndStatus(
+                    Severity.CRITICAL,
+                    IncidentStatus.OPEN
+                )
+                    + incidentRepository.countBySeverityAndStatus(
+                    Severity.CRITICAL,
+                    IncidentStatus.INVESTIGATING
+                );
+
+            statistics.removeAll();
+
+            statistics.add(
+                createCard(
+                    "Security Events",
+                    stats.securityEvents()
+                ),
+                createCard(
+                    "Security Incidents",
+                    stats.securityIncidents()
+                ),
+                createCard(
+                    "Active Alerts",
+                    stats.activeAlerts()
+                ),
+                createCard(
+                    "Total Users",
+                    stats.users()
+                ),
+                createCard(
+                    "Open Incidents",
+                    openIncidents
+                ),
+                createCard(
+                    "Critical Incidents",
+                    criticalIncidents
+                )
+            );
+
+        } catch (Exception ex) {
+            Notification.show(
+                "Không thể tải thống kê: " + ex.getMessage(),
+                5000,
+                Notification.Position.TOP_CENTER
+            );
+        }
     }
 
     private void generateEvents() {
 
         try {
-
             if (!isAdmin()) {
                 throw new SecurityException(
                     "Chỉ ADMIN mới được tạo sự kiện demo."
                 );
             }
 
-            int count =
-                simulatorService.generateDemoEvents();
+            int count = simulatorService.generateDemoEvents();
 
             refreshStatistics();
 
@@ -151,35 +213,46 @@ public class DashboardView extends VerticalLayout {
             );
 
         } catch (Exception ex) {
-
             Notification.show(
-                "Không thể tạo sự kiện: "
-                    + ex.getMessage(),
+                "Không thể tạo sự kiện: " + ex.getMessage(),
                 5000,
                 Notification.Position.TOP_CENTER
             );
         }
     }
 
-    private VerticalLayout createCard(
-        String name,
-        long value) {
+    private VerticalLayout createCard(String name, long value) {
 
         VerticalLayout card = new VerticalLayout();
 
-        card.add(
-            new Paragraph(name),
-            new H2(String.valueOf(value))
-        );
+        Paragraph label = new Paragraph(name);
 
-        card.setWidthFull();
+        label.getStyle()
+            .set("color", "#cbd5e1")
+            .set("font-size", "15px")
+            .set("margin", "0");
+
+        H2 number = new H2(String.valueOf(value));
+
+        number.getStyle()
+            .set("color", "#ffffff")
+            .set("font-size", "32px")
+            .set("font-weight", "700")
+            .set("margin", "0");
+
+        card.add(label, number);
+
+        card.setWidth("220px");
+        card.setMinWidth("180px");
         card.setPadding(true);
         card.setSpacing(true);
 
         card.getStyle()
             .set("background", "#172033")
             .set("color", "#ffffff")
-            .set("border-radius", "12px");
+            .set("border-radius", "12px")
+            .set("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
+            .set("box-sizing", "border-box");
 
         return card;
     }

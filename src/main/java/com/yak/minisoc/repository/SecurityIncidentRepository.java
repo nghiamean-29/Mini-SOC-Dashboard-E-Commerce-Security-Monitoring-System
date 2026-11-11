@@ -109,6 +109,19 @@ public interface SecurityIncidentRepository
     // INCIDENT LISTS
     // ==========================================
 
+    @EntityGraph(attributePaths = "assignedTo")
+    @Query("""
+        select i from SecurityIncident i
+        where (:status is null or i.status = :status)
+          and (:severity is null or i.severity = :severity)
+        order by i.detectedAt desc, i.id desc
+        """)
+    Page<SecurityIncident> findForMonitoring(
+        @Param("status") IncidentStatus status,
+        @Param("severity") Severity severity,
+        Pageable pageable
+    );
+
     Page<SecurityIncident> findAllByOrderByDetectedAtDesc(
         Pageable pageable
     );

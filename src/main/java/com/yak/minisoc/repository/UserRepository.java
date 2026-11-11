@@ -43,6 +43,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     long countByStatus(UserStatus status);
 
+    @Query("""
+        select u from User u join u.roles r
+        where u.status = :status and r.code = 'SOC_ANALYST'
+        order by u.username
+        """)
+    List<User> findSocAnalystsByStatus(@Param("status") UserStatus status);
+
     /** Newest accounts first, for the admin console. */
     List<User> findAllByOrderByCreatedAtDesc();
 }
