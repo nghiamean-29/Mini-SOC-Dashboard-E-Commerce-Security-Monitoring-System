@@ -109,7 +109,11 @@ public class DashboardView extends VerticalLayout {
             )
         );
 
-        actions.add(incidentsButton);
+        Button alertsButton = new Button(
+            "View Security Alerts",
+            event -> getUI().ifPresent(ui -> ui.navigate(AlertMonitoringView.class))
+        );
+        actions.add(alertsButton, incidentsButton);
         add(
             title,
             subtitle,

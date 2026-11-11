@@ -97,6 +97,22 @@ public interface SecurityAlertRepository
     // ALERT LISTS
     // ==========================================
 
+    @Query("""
+        select a from SecurityAlert a
+        where (:severity is null or a.severity = :severity)
+          and (:status is null or a.status = :status)
+          and (:type is null or a.alertType = :type)
+          and (:sourceIp is null or a.sourceIp = :sourceIp)
+        order by a.detectedAt desc, a.id desc
+        """)
+    Page<SecurityAlert> findForMonitoring(
+        @Param("severity") Severity severity,
+        @Param("status") AlertStatus status,
+        @Param("type") AlertType type,
+        @Param("sourceIp") String sourceIp,
+        Pageable pageable
+    );
+
     Page<SecurityAlert> findAllByOrderByDetectedAtDesc(
         Pageable pageable
     );
