@@ -216,4 +216,33 @@ public interface SecurityEventRepository
     int deleteOlderThan(
         @Param("cutoff") Instant cutoff
     );
+    interface TimelineCount {
+        long getEpochSecond();
+        long getTotal();
+    }
+
+    interface SeverityCount {
+        Severity getSeverity();
+        long getTotal();
+    }
+
+    @Query(value = """
+        SELECT CAST(EXTRACT(EPOCH FROM date_trunc(:bucket, occurred_at, 'UTC')) AS bigint) AS "epochSecond",
+               COUNT(*) AS total
+        FROM security_events
+        WHERE occurred_at >= :from AND occurred_at < :to
+        GROUP BY 1
+        """, nativeQuery = true)
+    List<TimelineCount> countTimelineBetween(
+        @Param("from") Instant from, @Param("to") Instant to, @Param("bucket") String bucket
+    );
+
+    @Query("""
+        SELECT e.severityHint AS severity, COUNT(e) AS total
+        FROM SecurityEvent e
+        WHERE e.occurredAt >= :from AND e.occurredAt < :to
+        GROUP BY e.severityHint
+        """)
+    List<SeverityCount> countBySeverityBetween(@Param("from") Instant from, @Param("to") Instant to);
+
 }

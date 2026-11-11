@@ -14,6 +14,7 @@ import com.vaadin.flow.router.Route;
 import com.yak.minisoc.entity.security.IncidentStatus;
 import com.yak.minisoc.entity.security.Severity;
 import com.yak.minisoc.repository.SecurityIncidentRepository;
+import com.yak.minisoc.service.DashboardAnalyticsService;
 import com.yak.minisoc.service.DashboardService;
 import com.yak.minisoc.service.SecurityEventSimulatorService;
 
@@ -30,17 +31,20 @@ public class DashboardView extends VerticalLayout {
     private final DashboardService dashboardService;
     private final SecurityEventSimulatorService simulatorService;
     private final SecurityIncidentRepository incidentRepository;
+    private final DashboardAnalyticsPanel analytics;
 
     private final HorizontalLayout statistics = new HorizontalLayout();
 
     public DashboardView(
         DashboardService dashboardService,
         SecurityEventSimulatorService simulatorService,
-        SecurityIncidentRepository incidentRepository) {
+        SecurityIncidentRepository incidentRepository,
+        DashboardAnalyticsService analyticsService) {
 
         this.dashboardService = dashboardService;
         this.simulatorService = simulatorService;
         this.incidentRepository = incidentRepository;
+        this.analytics = new DashboardAnalyticsPanel(analyticsService);
 
         setSizeFull();
         setPadding(true);
@@ -61,11 +65,11 @@ public class DashboardView extends VerticalLayout {
             .set("flex-wrap", "wrap")
             .set("gap", "16px");
 
-        refreshStatistics();
+        refreshDashboard();
 
         Button refreshButton = new Button(
             "Refresh Dashboard",
-            event -> refreshStatistics()
+            event -> refreshDashboard()
         );
 
         Button eventsButton = new Button(
@@ -114,7 +118,8 @@ public class DashboardView extends VerticalLayout {
             new Paragraph(
                 "Dữ liệu thống kê được lấy từ PostgreSQL."
             ),
-            actions
+            actions,
+            analytics
         );
     }
 
@@ -132,6 +137,11 @@ public class DashboardView extends VerticalLayout {
                     authority.getAuthority()
                 )
             );
+    }
+
+    private void refreshDashboard() {
+        refreshStatistics();
+        analytics.refresh();
     }
 
     private void refreshStatistics() {
@@ -204,7 +214,7 @@ public class DashboardView extends VerticalLayout {
 
             int count = simulatorService.generateDemoEvents();
 
-            refreshStatistics();
+            refreshDashboard();
 
             Notification.show(
                 "Đã tạo " + count + " security events!",

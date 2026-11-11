@@ -183,4 +183,37 @@ public interface SecurityAlertRepository
                 : 100.0 * getFalsePositives() / getTotal();
         }
     }
+    interface AttackTypeCount {
+        AlertType getAlertType();
+        long getTotal();
+    }
+
+    interface SourceIpCount {
+        String getSourceIp();
+        long getTotal();
+    }
+
+    @Query("""
+        SELECT a.alertType AS alertType, COUNT(a) AS total
+        FROM SecurityAlert a
+        WHERE a.detectedAt >= :from AND a.detectedAt < :to
+          AND a.status <> com.yak.minisoc.entity.security.AlertStatus.FALSE_POSITIVE
+        GROUP BY a.alertType
+        ORDER BY COUNT(a) DESC, a.alertType ASC
+        """)
+    List<AttackTypeCount> countAttackTypesBetween(@Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("""
+        SELECT a.sourceIp AS sourceIp, COUNT(a) AS total
+        FROM SecurityAlert a
+        WHERE a.detectedAt >= :from AND a.detectedAt < :to
+          AND a.status <> com.yak.minisoc.entity.security.AlertStatus.FALSE_POSITIVE
+          AND a.sourceIp IS NOT NULL AND TRIM(a.sourceIp) <> ''
+        GROUP BY a.sourceIp
+        ORDER BY COUNT(a) DESC, a.sourceIp ASC
+        """)
+    List<SourceIpCount> findTopSuspiciousIpsBetween(
+        @Param("from") Instant from, @Param("to") Instant to, Pageable pageable
+    );
+
 }

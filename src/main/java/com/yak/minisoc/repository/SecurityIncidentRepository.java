@@ -166,4 +166,17 @@ public interface SecurityIncidentRepository
         nativeQuery = true
     )
     long nextIncidentNumber();
+    interface StatusCount {
+        IncidentStatus getStatus();
+        long getTotal();
+    }
+
+    @Query("""
+        SELECT i.status AS status, COUNT(i) AS total
+        FROM SecurityIncident i
+        WHERE i.detectedAt >= :from AND i.detectedAt < :to
+        GROUP BY i.status
+        """)
+    List<StatusCount> countByStatusBetween(@Param("from") Instant from, @Param("to") Instant to);
+
 }
