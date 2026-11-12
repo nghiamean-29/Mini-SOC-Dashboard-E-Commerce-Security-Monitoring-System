@@ -30,7 +30,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
             .orElseThrow(() ->
                 new UsernameNotFoundException("Invalid username or password"));
 
-        boolean active = user.getStatus() == UserStatus.ACTIVE;
+        UserStatus status = user.getStatus();
 
         var authorities = user.getRoleCodes().stream()
             .map(code -> new SimpleGrantedAuthority(
@@ -41,7 +41,8 @@ public class DatabaseUserDetailsService implements UserDetailsService {
             .withUsername(user.getUsername())
             .password(user.getPasswordHash())
             .authorities(authorities)
-            .disabled(!active)
+            .accountLocked(status == UserStatus.LOCKED)
+            .disabled(status == UserStatus.DISABLED)
             .build();
     }
 }

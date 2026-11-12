@@ -12,6 +12,8 @@ import com.yak.minisoc.repository.RoleRepository;
 import com.yak.minisoc.repository.SecurityAlertRepository;
 import com.yak.minisoc.repository.SecurityIncidentRepository;
 import com.yak.minisoc.repository.UserRepository;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
@@ -84,7 +86,14 @@ class IncidentWorkflowIntegrationTest {
         assertThat(reload(incidentId).getStatus()).isEqualTo(IncidentStatus.INVESTIGATING);
 
         String content = "Confirmed repeated failed logins from the alert source.";
-        service.addInvestigationNote(incidentId, analyst.getId(), content);
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new TestingAuthenticationToken(analyst.getUsername(), null, "ROLE_SOC_ANALYST"));
+        SecurityContextHolder.setContext(context);
+        try {
+            service.addInvestigationNote(incidentId, analyst.getId(), content);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
         String resolution = "Blocked the source and verified that the failures stopped.";
         service.resolveIncident(incidentId, resolution);
 

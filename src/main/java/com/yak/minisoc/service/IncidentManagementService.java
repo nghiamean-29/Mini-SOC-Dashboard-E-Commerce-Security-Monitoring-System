@@ -17,10 +17,14 @@ import java.util.Objects;
 
 import org.springframework.data.domain.PageRequest;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@PreAuthorize("hasAnyRole('ADMIN', 'SOC_ANALYST')")
 @Transactional
 public class IncidentManagementService {
 
@@ -220,6 +224,7 @@ public class IncidentManagementService {
         return incidentRepository.save(incident);
     }
 
+    @PreAuthorize("hasRole('SOC_ANALYST')")
     public IncidentNote addInvestigationNote(
         Long incidentId,
         Long authorId,
@@ -260,6 +265,12 @@ public class IncidentManagementService {
             || !incident.getAssignedTo().getId().equals(authorId)) {
             throw new IllegalStateException(
                 "Only the assigned analyst can add notes");
+        }
+
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+            || !authentication.getName().equals(author.getUsername())) {
+            throw new AccessDeniedException("Investigation notes must use the signed-in analyst.");
         }
 
         IncidentNote note = incident.addNote(

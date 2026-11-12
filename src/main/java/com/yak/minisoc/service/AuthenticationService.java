@@ -21,6 +21,7 @@ public class AuthenticationService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // The Swing login opens the SOC dashboard directly.
     public User authenticate(String username, char[] password) {
 
         if (username == null || username.isBlank()
@@ -48,6 +49,12 @@ public class AuthenticationService {
             rawPassword, user.getPasswordHash())) {
             throw new IllegalArgumentException(
                 "Tên đăng nhập hoặc mật khẩu không đúng"
+            );
+        }
+
+        if (!user.hasRole("ADMIN") && !user.hasRole("SOC_ANALYST")) {
+            throw new IllegalArgumentException(
+                "Tài khoản không được phép truy cập bảng điều khiển SOC"
             );
         }
 

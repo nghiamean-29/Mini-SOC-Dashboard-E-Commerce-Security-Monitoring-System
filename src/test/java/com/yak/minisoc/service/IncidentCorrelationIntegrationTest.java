@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -25,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@WithMockUser(roles = "SOC_ANALYST")
 class IncidentCorrelationIntegrationTest {
 
     private static final Instant START = Instant.parse("2026-11-05T07:00:00Z");
@@ -102,7 +105,7 @@ class IncidentCorrelationIntegrationTest {
         var second = alert(AlertType.BRUTE_FORCE, SOURCE_IP, START.plusSeconds(1));
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
-        try (var executor = Executors.newFixedThreadPool(2)) {
+        try (var executor = new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2))) {
             var firstResult = executor.submit(() -> {
                 ready.countDown();
                 start.await(10, TimeUnit.SECONDS);

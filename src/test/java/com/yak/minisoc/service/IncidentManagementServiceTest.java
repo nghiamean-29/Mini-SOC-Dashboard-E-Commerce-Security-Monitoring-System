@@ -26,6 +26,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -670,8 +674,20 @@ class IncidentManagementServiceTest {
             .hasMessageContaining("inactive incident");
     }
 
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void signInAsAnalyst() {
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new TestingAuthenticationToken("soc_analyst", null, "ROLE_SOC_ANALYST"));
+        SecurityContextHolder.setContext(context);
+    }
+
     @Test
     void shouldRejectBlankInvestigationNote() {
+        signInAsAnalyst();
         SecurityIncident incident = createOpenIncident();
 
         User analyst = org.mockito.Mockito.mock(User.class);
@@ -686,6 +702,7 @@ class IncidentManagementServiceTest {
             .thenReturn(Optional.of(incident));
         when(userRepository.findById(10L))
             .thenReturn(Optional.of(analyst));
+        when(analyst.getUsername()).thenReturn("soc_analyst");
 
         assertThatThrownBy(
             () -> service.addInvestigationNote(1L, 10L, "  "))
@@ -698,6 +715,7 @@ class IncidentManagementServiceTest {
 
     @Test
     void shouldAddInvestigationNoteSuccessfully() {
+        signInAsAnalyst();
         SecurityIncident incident = createOpenIncident();
 
         User analyst = org.mockito.Mockito.mock(User.class);

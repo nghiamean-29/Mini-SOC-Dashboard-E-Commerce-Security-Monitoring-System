@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -29,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@WithMockUser(roles = "SOC_ANALYST")
 class IncidentDeduplicationIntegrationTest {
 
     @Autowired
@@ -122,7 +125,7 @@ class IncidentDeduplicationIntegrationTest {
         CountDownLatch startLatch = new CountDownLatch(1);
 
         ExecutorService executor =
-            Executors.newFixedThreadPool(requestCount);
+            new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(requestCount));
 
         List<Future<SecurityIncident>> futures =
             new ArrayList<>();
