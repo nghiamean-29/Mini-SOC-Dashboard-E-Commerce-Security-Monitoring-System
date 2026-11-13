@@ -102,6 +102,22 @@ class SecurityEventRepositoryTest {
     }
 
     @Test
+    void nativeJsonbFilterTreatsSqlSyntaxInsideJsonAsData() {
+        String payload = "x') OR true --";
+        SecurityEvent target = events.saveAndFlush(
+                SecurityEvent.of(SecurityEventType.API_REQUEST, Instant.now(), "198.51.100.7", "/products")
+                        .withMetadata(Map.of("phase92Probe", payload)));
+        events.saveAndFlush(
+                SecurityEvent.of(SecurityEventType.API_REQUEST, Instant.now(), "198.51.100.8", "/products")
+                        .withMetadata(Map.of("phase92Probe", "ordinary")));
+        em.clear();
+
+        assertThat(events.findByMetadataContaining("{\"phase92Probe\":\"" + payload + "\"}"))
+                .extracting(SecurityEvent::getId).containsExactly(target.getId());
+        assertThat(events.findByMetadataContaining("{\"phase92Probe\":\"' OR '1'='1\"}")).isEmpty();
+    }
+
+    @Test
     @DisplayName("the investigation queries return the right window, newest first")
     void investigationQueries() {
         String attacker = "203.0.113.99";

@@ -97,9 +97,9 @@ public class CheckoutService {
             );
         }
 
-        if (note != null && note.length() > 500) {
+        if (note != null && (note.length() > 500 || note.indexOf('\0') >= 0)) {
             throw new IllegalArgumentException(
-                "Ghi chú không được vượt quá 500 ký tự."
+                "Ghi chú không hợp lệ hoặc vượt quá 500 ký tự."
             );
         }
 
@@ -274,6 +274,10 @@ public class CheckoutService {
             throw new IllegalArgumentException(
                 field + " không được để trống."
             );
+        }
+
+        if (value.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException(field + " chứa ký tự không hợp lệ.");
         }
 
         String result = value.trim();

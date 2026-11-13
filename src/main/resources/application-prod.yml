@@ -20,10 +20,6 @@ server:
         # In production the application sits behind HTTPS (reverse proxy),
         # so the session cookie must only travel over TLS.
         secure: true
-  error:
-    include-message: never
-    include-stacktrace: never
-    include-exception: false
 
 app:
   simulator:

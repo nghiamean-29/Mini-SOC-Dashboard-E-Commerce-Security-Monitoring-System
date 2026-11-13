@@ -1,6 +1,9 @@
 
 package com.yak.minisoc.view;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H2;
@@ -25,6 +28,8 @@ import java.util.Locale;
 @PageTitle("Đặt hàng | Mini SOC")
 @RolesAllowed("CUSTOMER")
 public class CheckoutView extends VerticalLayout {
+
+    private static final Logger log = LoggerFactory.getLogger(CheckoutView.class);
 
     private final CheckoutService checkoutService;
     private final CartService cartService;
@@ -115,10 +120,10 @@ public class CheckoutView extends VerticalLayout {
                 );
 
             } catch (Exception ex) {
+                log.warn("Checkout failed ({})", ex.getClass().getSimpleName());
 
                 Notification.show(
-                    "Không thể đặt hàng: "
-                        + ex.getMessage(),
+                    "Không thể đặt hàng. Vui lòng kiểm tra thông tin và giỏ hàng.",
                     5000,
                     Notification.Position.MIDDLE
                 );

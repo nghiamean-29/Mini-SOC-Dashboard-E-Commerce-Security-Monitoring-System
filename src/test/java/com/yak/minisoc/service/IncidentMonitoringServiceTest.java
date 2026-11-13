@@ -92,6 +92,18 @@ class IncidentMonitoringServiceTest {
         verifyNoInteractions(management);
     }
 
+    @Test
+    void rejectsNulBeforeWritingInvestigationText() {
+        authenticate("SOC_ANALYST");
+        account(UserStatus.ACTIVE, "SOC_ANALYST");
+
+        assertThatThrownBy(() -> service.addNote(10L, "Bad\0evidence"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.resolve(10L, "Bad\0resolution"))
+            .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(management);
+    }
+
     private void account(UserStatus status, String role) {
         User actor = mock(User.class);
         when(actor.getId()).thenReturn(42L);

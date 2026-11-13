@@ -9,6 +9,8 @@ import static org.springframework.security.test.web.servlet.response.SecurityMoc
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.vaadin.flow.server.auth.AccessAnnotationChecker;
@@ -27,6 +29,8 @@ import com.yak.minisoc.repository.SecurityAlertRepository;
 import com.yak.minisoc.repository.UserRepository;
 import com.yak.minisoc.service.AlertMonitoringService;
 import com.yak.minisoc.service.AuthenticationService;
+import com.yak.minisoc.service.CheckoutService;
+import com.yak.minisoc.service.RegistrationService;
 import com.yak.minisoc.service.IncidentManagementService;
 import com.yak.minisoc.service.IncidentMonitoringService;
 import com.yak.minisoc.service.OrderService;
@@ -41,6 +45,7 @@ import com.yak.minisoc.view.OrderHistoryView;
 import com.yak.minisoc.view.RegisterView;
 import com.yak.minisoc.view.SecurityEventsView;
 import com.yak.minisoc.view.ShopView;
+import jakarta.servlet.RequestDispatcher;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Set;
@@ -62,6 +67,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockRequestDispatcher;
+import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.DisabledException;
@@ -126,6 +133,11 @@ class SecurityIntegrationTest {
     private ProductRepository products;
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private CheckoutService checkout;
+    @Autowired
+    private RegistrationService registration;
 
     private MockMvc mvc;
 
@@ -214,6 +226,107 @@ class SecurityIntegrationTest {
         mvc.perform(post("/logout").session(session).with(csrf()))
             .andExpect(status().is3xxRedirection()).andExpect(unauthenticated());
         assertThat(session.isInvalid()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/login", "/logout"})
+    void loginAndLogoutRejectInvalidCsrfEvenWithVaadinRequestMarker(String path) throws Exception {
+        mvc.perform(post(path).with(csrf().useInvalidToken()).param("v-r", "uidl"))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void onlyTheVaadinServletRootAcceptsTheUidlMarkerWithoutSpringCsrf() throws Exception {
+        // MockMvc can verify the forward, while the real servlet is responsible for UIDL token validation.
+        var servletContext = (MockServletContext) application.getServletContext();
+        servletContext.registerNamedDispatcher("springServlet", new MockRequestDispatcher("/vaadin-servlet"));
+        try {
+            mvc.perform(post("/").param("v-r", "uidl").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(forwardedUrl("/vaadin-servlet"));
+            mvc.perform(post("/").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden());
+            mvc.perform(post("/register").param("v-r", "uidl").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden());
+        } finally {
+            servletContext.unregisterNamedDispatcher("springServlet");
+        }
+    }
+
+    @Test
+    void sqlInjectionUsernameCannotAuthenticateWithAnExistingPassword() throws Exception {
+        String password = UUID.randomUUID().toString();
+        User customer = account("CUSTOMER", UserStatus.ACTIVE, password);
+
+        mvc.perform(post("/login").with(csrf())
+                .param("username", customer.getUsername() + "' OR '1'='1' --")
+                .param("password", password))
+            .andExpect(status().is3xxRedirection()).andExpect(unauthenticated());
+
+        mvc.perform(post("/login").with(csrf())
+                .param("username", customer.getUsername()).param("password", password))
+            .andExpect(authenticated().withUsername(customer.getUsername()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 500})
+    void errorResponseHidesExceptionDetailsEvenWhenRequested(int code) throws Exception {
+        String internalDetail = "internal-sql-detail-" + UUID.randomUUID();
+
+        mvc.perform(get("/error").accept(MediaType.APPLICATION_JSON)
+                .param("trace", "true").param("message", "true").param("errors", "true")
+                .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, code)
+                .requestAttr(RequestDispatcher.ERROR_MESSAGE, internalDetail)
+                .requestAttr(RequestDispatcher.ERROR_EXCEPTION, new IllegalStateException(internalDetail))
+                .requestAttr(RequestDispatcher.ERROR_REQUEST_URI, "/test-failure"))
+            .andExpect(status().is(code))
+            .andExpect(jsonPath("$.status").value(code))
+            .andExpect(jsonPath("$.path").value("/test-failure"))
+            .andExpect(jsonPath("$.message").doesNotExist())
+            .andExpect(jsonPath("$.exception").doesNotExist())
+            .andExpect(jsonPath("$.trace").doesNotExist())
+            .andExpect(jsonPath("$.errors").doesNotExist())
+            .andExpect(result -> assertThat(result.getResponse().getContentAsString())
+                .doesNotContain(internalDetail, "IllegalStateException"));
+    }
+
+    @Test
+    void registrationRejectsNulInEmailBeforePersistence() {
+        String username = "probe_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        String password = UUID.randomUUID().toString();
+
+        assertThatThrownBy(() -> registration.register(username, "probe\0x@example.com", password))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("Email không hợp lệ.");
+        assertThat(users.findByUsername(username)).isEmpty();
+    }
+
+    @Test
+    void registrationPersistsNormalizedValidEmail() {
+        String username = "probe_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        registration.register(username, "  " + username + "@EXAMPLE.COM  ", UUID.randomUUID().toString());
+        assertThat(users.findByUsername(username)).hasValueSatisfying(user ->
+            assertThat(user.getEmail()).isEqualTo(username + "@example.com"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"Nguyễn Văn An, bad\0note", "bad\0name, Giao giờ hành chính"})
+    @WithMockUser(roles = "CUSTOMER")
+    void checkoutRejectsNulInPersistedTextBeforeAccessingTheCart(String name, String note) {
+        assertThatThrownBy(() -> checkout.checkout(name, "0912345678", "12 Nguyễn Trãi", note))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("không hợp lệ");
+    }
+
+    @Test
+    void orderCancellationRejectsNulBeforeLookingUpOrder() {
+        User customer = account("CUSTOMER", UserStatus.ACTIVE, UUID.randomUUID().toString());
+        SecurityContextHolder.getContext().setAuthentication(
+            new TestingAuthenticationToken(customer.getUsername(), null, "ROLE_CUSTOMER"));
+
+        try {
+            assertThatThrownBy(() -> orderService.cancelMyOrder("ORD-20261112-999999", "Lý do\0hủy"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("ký tự không hợp lệ");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test

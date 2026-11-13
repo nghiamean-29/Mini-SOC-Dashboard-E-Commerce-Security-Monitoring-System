@@ -11,6 +11,13 @@
 # =============================================================================
 spring:
 
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
+      include-exception: false
+      include-binding-errors: never
+
   application:
     name: mini-soc-dashboard
 
@@ -73,12 +80,6 @@ server:
         http-only: true
         # Do not send the cookie on cross-site requests (classic CSRF defence)
         same-site: lax
-  error:
-    # Never leak exception messages, stack traces or exception class names to
-    # the browser: error pages must not become an information-disclosure channel.
-    include-message: never
-    include-stacktrace: never
-    include-exception: false
 
 # =============================================================================
 # Application-specific settings, bound to Java classes with @ConfigurationProperties.

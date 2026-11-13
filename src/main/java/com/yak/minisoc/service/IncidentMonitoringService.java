@@ -139,8 +139,8 @@ public class IncidentMonitoringService {
     }
 
     private static String requiredText(String text) {
-        if (text == null || text.isBlank() || text.length() > MAX_TEXT_LENGTH) {
-            throw new IllegalArgumentException("Enter between 1 and " + MAX_TEXT_LENGTH + " characters.");
+        if (text == null || text.isBlank() || text.length() > MAX_TEXT_LENGTH || text.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException("Enter between 1 and " + MAX_TEXT_LENGTH + " characters without NUL.");
         }
         return text.strip();
     }

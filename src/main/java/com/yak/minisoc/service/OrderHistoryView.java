@@ -1,6 +1,9 @@
 
 package com.yak.minisoc.view;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -33,6 +36,8 @@ import java.util.Locale;
 @PageTitle("Lịch sử đơn hàng | Mini SOC")
 @RolesAllowed("CUSTOMER")
 public class OrderHistoryView extends VerticalLayout {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderHistoryView.class);
 
     private static final int PAGE_SIZE = 10;
 
@@ -210,9 +215,9 @@ public class OrderHistoryView extends VerticalLayout {
             );
 
         } catch (Exception ex) {
-
+            log.warn("Order history operation failed ({})", ex.getClass().getSimpleName());
             showError(
-                "Không thể tải đơn hàng: " + ex.getMessage()
+                "Không thể tải đơn hàng. Vui lòng thử lại."
             );
         }
     }
@@ -314,9 +319,9 @@ public class OrderHistoryView extends VerticalLayout {
             dialog.open();
 
         } catch (Exception ex) {
-
+            log.warn("Order history operation failed ({})", ex.getClass().getSimpleName());
             showError(
-                "Không thể xem chi tiết: " + ex.getMessage()
+                "Không thể xem chi tiết đơn hàng. Vui lòng thử lại."
             );
         }
     }
@@ -415,10 +420,9 @@ public class OrderHistoryView extends VerticalLayout {
                 loadOrders();
 
             } catch (Exception ex) {
-
+                log.warn("Order cancellation failed ({})", ex.getClass().getSimpleName());
                 showError(
-                    "Không thể hủy đơn hàng: "
-                        + ex.getMessage()
+                    "Không thể hủy đơn hàng. Vui lòng kiểm tra trạng thái đơn."
                 );
 
             } finally {

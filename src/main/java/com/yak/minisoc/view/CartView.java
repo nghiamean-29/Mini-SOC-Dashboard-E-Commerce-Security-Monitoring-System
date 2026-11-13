@@ -1,6 +1,9 @@
 
 package com.yak.minisoc.view;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
@@ -27,6 +30,8 @@ import java.util.Locale;
 @PageTitle("Giỏ hàng | Mini SOC")
 @RolesAllowed("CUSTOMER")
 public class CartView extends VerticalLayout {
+
+    private static final Logger log = LoggerFactory.getLogger(CartView.class);
 
     private final CartService cartService;
 
@@ -299,9 +304,10 @@ public class CartView extends VerticalLayout {
     // =================================
 
     private void showError(Exception ex) {
+        log.warn("Cart operation failed ({})", ex.getClass().getSimpleName());
 
         Notification.show(
-            "Lỗi giỏ hàng: " + ex.getMessage(),
+            "Không thể cập nhật giỏ hàng. Vui lòng thử lại.",
             4000,
             Notification.Position.MIDDLE
         );

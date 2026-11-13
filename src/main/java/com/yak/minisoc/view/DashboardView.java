@@ -1,6 +1,9 @@
 
 package com.yak.minisoc.view;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
@@ -27,6 +30,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 @PageTitle("Dashboard | Mini SOC")
 @RolesAllowed({"ADMIN", "SOC_ANALYST"})
 public class DashboardView extends VerticalLayout {
+
+    private static final Logger log = LoggerFactory.getLogger(DashboardView.class);
 
     private final DashboardService dashboardService;
     private final SecurityEventSimulatorService simulatorService;
@@ -199,8 +204,9 @@ public class DashboardView extends VerticalLayout {
             );
 
         } catch (Exception ex) {
+            log.warn("Dashboard statistics could not be loaded ({})", ex.getClass().getSimpleName());
             Notification.show(
-                "Không thể tải thống kê: " + ex.getMessage(),
+                "Không thể tải thống kê. Vui lòng thử lại.",
                 5000,
                 Notification.Position.TOP_CENTER
             );
@@ -227,8 +233,9 @@ public class DashboardView extends VerticalLayout {
             );
 
         } catch (Exception ex) {
+            log.warn("Simulation event could not be created ({})", ex.getClass().getSimpleName());
             Notification.show(
-                "Không thể tạo sự kiện: " + ex.getMessage(),
+                "Không thể tạo sự kiện. Vui lòng thử lại.",
                 5000,
                 Notification.Position.TOP_CENTER
             );

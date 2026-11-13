@@ -53,6 +53,19 @@ class ConfigurationFilesTest {
     }
 
     @Test
+    void allProfilesSuppressWebErrorDetailsByDefault() throws IOException {
+        PropertySource<?> base = load(BASE_CONFIG);
+        for (String key : List.of("include-message", "include-stacktrace", "include-binding-errors")) {
+            assertThat(rawValue(base, "spring.web.error." + key)).isEqualTo("never");
+        }
+        assertThat(base.getProperty("spring.web.error.include-exception")).isEqualTo(false);
+        for (String profile : List.of(DEV_CONFIG, PROD_CONFIG)) {
+            assertThat(propertyNames(load(profile))).noneMatch(name ->
+                name.startsWith("spring.web.error.include-") || name.startsWith("server.error.include-"));
+        }
+    }
+
+    @Test
     @DisplayName("declares the application name")
     void declaresApplicationName() throws IOException {
         assertThat(rawValue(load(BASE_CONFIG), "spring.application.name"))

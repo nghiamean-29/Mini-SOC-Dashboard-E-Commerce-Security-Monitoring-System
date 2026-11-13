@@ -436,7 +436,10 @@ public class SecurityEventsView extends VerticalLayout {
     // ==========================================
 
     private void showDetails(SecurityEvent event) {
+        createDetailsDialog(event).open();
+    }
 
+    static Dialog createDetailsDialog(SecurityEvent event) {
         Dialog dialog = new Dialog();
 
         dialog.setWidth("650px");
@@ -527,7 +530,7 @@ public class SecurityEventsView extends VerticalLayout {
             closeButton
         );
 
-        dialog.open();
+        return dialog;
     }
 
     // ==========================================
@@ -559,21 +562,21 @@ public class SecurityEventsView extends VerticalLayout {
         return value.trim();
     }
 
-    private String display(String value) {
+    private static String display(String value) {
 
         return value == null || value.isBlank()
             ? "-"
             : value;
     }
 
-    private String displayEnum(Enum<?> value) {
+    private static String displayEnum(Enum<?> value) {
 
         return value == null
             ? "-"
             : value.name();
     }
 
-    private String formatTime(Instant instant) {
+    private static String formatTime(Instant instant) {
 
         return instant == null
             ? "-"

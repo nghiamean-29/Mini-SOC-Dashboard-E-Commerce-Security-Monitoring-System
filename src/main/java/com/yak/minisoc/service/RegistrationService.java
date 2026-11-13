@@ -5,7 +5,6 @@ import com.yak.minisoc.entity.Role;
 import com.yak.minisoc.entity.User;
 import com.yak.minisoc.repository.RoleRepository;
 import com.yak.minisoc.repository.UserRepository;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +45,7 @@ public class RegistrationService {
             );
         }
 
-        if (email.length() > 120 ||
+        if (email.length() > 120 || email.indexOf('\0') >= 0 ||
             !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
             throw new IllegalArgumentException(
                 "Email không hợp lệ."

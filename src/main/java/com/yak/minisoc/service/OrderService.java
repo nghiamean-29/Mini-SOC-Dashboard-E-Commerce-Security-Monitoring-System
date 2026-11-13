@@ -216,6 +216,9 @@ public class OrderService {
             );
         }
 
+        if (reason.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException("Lý do hủy chứa ký tự không hợp lệ.");
+        }
         String cancelReason = reason.trim();
 
         if (cancelReason.length() > MAX_CANCEL_REASON_LENGTH) {
